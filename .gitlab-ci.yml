@@ -9,7 +9,7 @@ job-test:
   script:
   	- cd ./simple_app
   	
-  	- if [ (! -f index.html) -o (! -f index.html) -o (! -f index.html)];then
+  	- if [ ! -f index.html -o ! -f index.html -o ! -f index.html];then
 	exit 1; 
   	fi 
   	
