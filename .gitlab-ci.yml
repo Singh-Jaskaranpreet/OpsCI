@@ -10,7 +10,7 @@ job-test:
   script:
     - cd ./simple_app
     - if [ ! -f index.html ] || [ ! -f styles.css ] || [ ! -f script.js ]; then
-       exit 1
+       exit 1;
       fi
 
 job-unit-test:
