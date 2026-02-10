@@ -10,8 +10,7 @@ job-test:
   stage: test
   script:
     - cd ./simple_app
-    - |
-      if [ ! -f index.html ] || [ ! -f styles.css ] || [ ! -f script.js ]; then
+    - if [ ! -f index.html ] || [ ! -f styles.css ] || [ ! -f script.js ]; then
        exit 1
       fi
 
