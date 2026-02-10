@@ -1,10 +1,12 @@
-image: alpine:latest
+image: node:18
 
 stages:
   - test
+  - unit-test
   - deploy
 
 job-test:
+	
   stage: test
   script:
     - cd ./simple_app
@@ -13,6 +15,11 @@ job-test:
        exit 1
       fi
 
+job-unit-test:
+	stage: unit-test
+	script:
+		- npm install 
+		- npm test __test__/
 deploy:
   stage: deploy
   script:
