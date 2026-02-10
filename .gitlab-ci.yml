@@ -6,20 +6,18 @@ stages:
   - deploy
 
 job-test:
-	
   stage: test
   script:
     - cd ./simple_app
-    - |
-      if [ ! -f index.html ] || [ ! -f styles.css ] || [ ! -f script.js ]; then
-       exit 1
+    - if [ ! -f index.html ] || [ ! -f styles.css ] || [ ! -f script.js ]; then
+       exit 1;
       fi
 
 job-unit-test:
-	stage: unit-test
-	script:
-		- npm install 
-		- npm test __test__/
+  stage: unit-test
+  script:
+    - npm install jest 
+    - npm test __tests__/*
 deploy:
   stage: deploy
   script:
