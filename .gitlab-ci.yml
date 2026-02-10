@@ -6,7 +6,6 @@ stages:
   - deploy
 
 job-test:
-	
   stage: test
   script:
     - cd ./simple_app
