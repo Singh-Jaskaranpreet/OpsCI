@@ -1,7 +1,18 @@
 image: alpine:latest
 
 stages:
+  - test
   - deploy
+
+job-test:
+  stage: test
+  script:
+  	- cd ./simple_app
+  	
+  	- if [ (! -f index.html) -o (! -f index.html) -o (! -f index.html)];then
+	exit 1; 
+  	fi 
+  	
 
 deploy:
   stage: deploy
@@ -13,3 +24,4 @@ deploy:
       - public
   only:
     - main
+
