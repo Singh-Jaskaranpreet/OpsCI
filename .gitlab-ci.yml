@@ -18,7 +18,7 @@ job-test:
 job-unit-test:
 	stage: unit-test
 	script:
-		- npm install jest
+		- npm install 
 		- npm test __test__/
 deploy:
   stage: deploy
