@@ -14,10 +14,10 @@ job-test:
       fi
 
 job-unit-test:
-	stage: unit-test
-	script:
-		- npm install jest 
-		- npm test __tests__/*
+  stage: unit-test
+  script:
+    - npm install jest 
+    - npm test __tests__/*
 deploy:
   stage: deploy
   script:
