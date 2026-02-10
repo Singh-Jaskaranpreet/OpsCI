@@ -1,0 +1,15 @@
+image: alpine:latest
+
+stages:
+  - deploy
+
+deploy:
+  stage: deploy
+  script:
+    - mkdir -p public
+    - cp simple_app/index.html simple_app/styles.css simple_app/script.js public/
+  artifacts:
+    paths:
+      - public
+  only:
+    - main
