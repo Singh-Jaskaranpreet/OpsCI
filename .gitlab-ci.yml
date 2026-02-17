@@ -5,6 +5,14 @@ stages:
   - unit-test
   - deploy
 
+test:
+  stage: test
+  script:
+    - echo "Verification de l'existence des fichiers..."
+    - ls -a
+  tags:
+    - linux_mac
+    
 job-test:
   stage: test
   script:
@@ -18,6 +26,7 @@ job-unit-test:
   script:
     - npm install jest 
     - npm test __tests__/*
+    
 deploy:
   stage: deploy
   script:
