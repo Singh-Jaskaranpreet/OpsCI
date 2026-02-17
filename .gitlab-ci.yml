@@ -11,7 +11,7 @@ test:
     - echo "Verification de l'existence des fichiers..."
     - ls -a
   tags:
-    - linux-mac
+    - linux_mac
     
 job-test:
   stage: test
