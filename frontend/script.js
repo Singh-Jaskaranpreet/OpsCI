@@ -1,50 +1,105 @@
 const API_URL = "http://127.0.0.1:8000";
 
 let allMovies = [];
+let currentLimit = 10;
 
-async function loadMovies() {
-  const res = await fetch(`${API_URL}/movies?limit=40`);
+// LOAD MOVIES
+async function loadMovies(limit = 10) {
+  const res = await fetch(`${API_URL}/movies?limit=${limit}`);
   allMovies = await res.json();
-
-  showCategory("trending"); // affichage par défaut
+  displayMovies(allMovies);
 }
 
-function showCategory(category) {
-  let movies = [];
-
-  if (category === "trending") {
-    movies = allMovies.slice(0, 10);
-  } else if (category === "popular") {
-    movies = allMovies.slice(10, 20);
-  } else if (category === "foryou") {
-    movies = allMovies.slice(20, 30);
-  } else if (category === "new") {
-    movies = allMovies.slice(30, 40);
-  }
-
-  displayMovies(movies);
-}
-
+// DISPLAY GRID
 function displayMovies(movies) {
   const container = document.getElementById("movies");
   container.innerHTML = "";
 
   movies.forEach(movie => {
-    const imageSrc = movie.image_url
-      ? API_URL + movie.image_url
-      : "https://via.placeholder.com/300x450";
-
     const card = document.createElement("div");
     card.className = "card";
 
     card.innerHTML = `
-      <img src="${imageSrc}" alt="${movie.title}">
-      <h2>${movie.title}</h2>
-      <p class="meta">${movie.director}</p>
+      <img src="${movie.image_url}">
+      <h3>${movie.title}</h3>
+      <p>${movie.year}</p>
     `;
+
+    card.onclick = () => showMovie(movie);
 
     container.appendChild(card);
   });
 }
 
+// SHOW MOVIE
+async function showMovie(movie) {
+  document.getElementById("movies").classList.add("hidden");
+  document.getElementById("loadMore").classList.add("hidden");
+  document.getElementById("movieView").classList.remove("hidden");
+
+  document.getElementById("title").innerText = movie.title;
+  document.getElementById("year").innerText = movie.year;
+  document.getElementById("rating").innerText = "⭐ " + movie.rating;
+  document.getElementById("desc").innerText = movie.description;
+  document.getElementById("movieImage").src = movie.image_url;
+
+  const fallback = document.getElementById("trailerFallback");
+  const thumb = document.getElementById("trailerThumbnail");
+
+  fallback.classList.add("hidden");
+
+  try {
+    const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/trailer`);
+    const data = await res.json();
+
+    if (data.url) {
+      const videoId = data.url.split("v=")[1];
+
+      thumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+
+      fallback.classList.remove("hidden");
+
+      fallback.onclick = () => {
+        window.open(data.url, "_blank");
+      };
+
+    } else {
+      fallback.innerHTML = "<p>Trailer non disponible</p>";
+      fallback.classList.remove("hidden");
+    }
+
+  } catch {
+    fallback.innerHTML = "<p>Erreur chargement trailer</p>";
+    fallback.classList.remove("hidden");
+  }
+}
+
+// BACK
+function goHome() {
+  document.getElementById("movieView").classList.add("hidden");
+  document.getElementById("movies").classList.remove("hidden");
+  document.getElementById("loadMore").classList.remove("hidden");
+
+  document.getElementById("trailerThumbnail").src = "";
+}
+
+// EVENTS
+document.getElementById("backBtn").onclick = goHome;
+
+document.getElementById("loadMore").onclick = () => {
+  currentLimit += 10;
+  loadMovies(currentLimit);
+};
+
+document.getElementById("search").addEventListener("input", (e) => {
+  const q = e.target.value.toLowerCase();
+
+  const filtered = allMovies.filter(m =>
+    m.title.toLowerCase().includes(q)
+  );
+
+  displayMovies(filtered);
+});
+
+// INIT
 loadMovies();

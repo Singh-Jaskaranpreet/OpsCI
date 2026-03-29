@@ -1,75 +1,142 @@
 body {
   margin: 0;
-  background-color: #141414;
+  background-color: #0f0f0f;
   color: white;
-  font-family: Arial, sans-serif;
+  font-family: Arial;
 }
 
 /* NAVBAR */
 .navbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   background: black;
-  padding: 10px 30px;
+  padding: 15px;
+  text-align: center;
+  border-bottom: 2px solid orange;
 }
 
 .navbar h1 {
-  color: red;
-  margin: 0;
-}
-
-.navbar nav button {
-  background: none;
-  border: none;
-  color: white;
-  margin-left: 15px;
+  color: orange;
   cursor: pointer;
-  font-size: 14px;
 }
 
-.navbar nav button:hover {
-  color: red;
+/* SEARCH */
+.search-container {
+  display: flex;
+  justify-content: center;
+  margin: 20px;
 }
 
-/* CONTAINER */
+.search-container input {
+  width: 300px;
+  padding: 10px;
+  border-radius: 5px;
+  border: none;
+  background: #1c1c1c;
+  color: white;
+}
+
+/* GRID */
 .container {
   padding: 20px;
 }
 
-/* GRID */
 .movies-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 20px;
 }
 
-/* CARD */
 .card {
-  transition: transform 0.3s;
   cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
 }
 
 .card:hover {
-  transform: scale(1.08);
+  transform: scale(1.07);
+  box-shadow: 0 0 15px orange;
 }
 
 .card img {
   width: 100%;
-  height: 270px;
+  height: 240px;
   object-fit: cover;
+}
+
+/* BUTTONS */
+#loadMore {
+  margin-top: 20px;
+  padding: 10px;
+  width: 100%;
+  background: orange;
+  border: none;
+  color: black;
+  cursor: pointer;
+}
+
+/* MOVIE VIEW */
+#movieView {
+  text-align: center;
+  position: relative;
+}
+
+#backBtn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  padding: 10px 15px;
+  background: orange;
+  border: none;
+  color: black;
+  cursor: pointer;
   border-radius: 5px;
 }
 
-.card h2 {
-  font-size: 14px;
-  margin: 5px 0;
+.movie-poster {
+  width: 200px;
+  border-radius: 10px;
+  margin-bottom: 20px;
 }
 
-.meta {
-  font-size: 12px;
-  color: #aaa;
+#title {
+  color: orange;
 }
+
+#rating {
+  color: gold;
+}
+
+/* TRAILER THUMBNAIL */
+#trailerFallback {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  margin-top: 20px;
+}
+
+#trailerThumbnail {
+  width: 500px;
+  height: 280px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.play-button {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 40px;
+  background: rgba(0,0,0,0.6);
+  padding: 10px;
+  border-radius: 50%;
+}
+
+/* HIDDEN */
+.hidden {
+  display: none;
+}
+
+
+
 /* ================== Version TP2 ==================
 /** { box-sizing: border-box; }
 body {

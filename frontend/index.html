@@ -2,30 +2,51 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <title>Streamly</title>
+  <title>SINGHFLIX</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="navbar">
-  <h1>STREAMLY</h1>
-  <nav>
-    <button onclick="showCategory('trending')">Trending</button>
-    <button onclick="showCategory('popular')">Popular</button>
-    <button onclick="showCategory('foryou')">For You</button>
-    <button onclick="showCategory('new')">New</button>
-  </nav>
+  <h1 onclick="goHome()">SINGHFLIX</h1>
 </header>
 
+<div class="search-container">
+  <input type="text" id="search" placeholder="Rechercher un film...">
+</div>
+
 <main class="container">
+
+  <!-- GRID -->
   <div id="movies" class="movies-grid"></div>
+  <button id="loadMore">Charger plus</button>
+
+  <!-- PAGE FILM -->
+  <div id="movieView" class="hidden">
+
+    <button id="backBtn">⬅ Retour</button>
+
+    <img id="movieImage" class="movie-poster">
+
+    <h2 id="title"></h2>
+    <p id="year"></p>
+    <p id="rating"></p>
+    <p id="desc"></p>
+
+    <div id="trailerContainer">
+      <div id="trailerFallback" class="hidden">
+        <img id="trailerThumbnail">
+        <div class="play-button">▶</div>
+      </div>
+    </div>
+
+  </div>
+
 </main>
 
 <script src="script.js"></script>
-
 </body>
 </html>
-
 
 
 
