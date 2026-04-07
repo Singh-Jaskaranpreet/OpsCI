@@ -43,34 +43,24 @@ async function showMovie(movie) {
   document.getElementById("desc").innerText = movie.description;
   document.getElementById("movieImage").src = movie.image_url;
 
-  const fallback = document.getElementById("trailerFallback");
-  const thumb = document.getElementById("trailerThumbnail");
-
-  fallback.classList.add("hidden");
+  const iframe = document.getElementById("trailerIframe");
+  iframe.classList.add("hidden"); // Masquer l'iframe au début
 
   try {
-    const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/trailer`);
-    const data = await res.json();
+      const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/trailer`);
+      const data = await res.json();
 
-    if (data.url) {
-      const videoId = data.url.split("v=")[1];
-
-      thumb.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-
-      fallback.classList.remove("hidden");
-
-      fallback.onclick = () => {
-        window.open(data.url, "_blank");
-      };
-
-    } else {
-      fallback.innerHTML = "<p>Trailer non disponible</p>";
-      fallback.classList.remove("hidden");
-    }
-
-  } catch {
-    fallback.innerHTML = "<p>Erreur chargement trailer</p>";
-    fallback.classList.remove("hidden");
+      if (data.url) {
+          const videoId = data.url.split("v=")[1];  // Extraire l'ID de la vidéo YouTube
+          iframe.src = `https://www.youtube.com/embed/${videoId}`;  // Insérer l'ID dans l'iframe
+          iframe.classList.remove("hidden");  // Afficher l'iframe avec la vidéo
+      } else {
+          iframe.classList.add("hidden");
+          alert("Trailer non disponible pour ce film.");
+      }
+  } catch (error) {
+      console.error("Erreur lors du chargement du trailer", error);
+      alert("Erreur de chargement du trailer.");
   }
 }
 
