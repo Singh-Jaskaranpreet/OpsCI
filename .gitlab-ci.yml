@@ -1,5 +1,7 @@
 image: node:18
 
+
+
 stages:
   - test
   - unit-test
