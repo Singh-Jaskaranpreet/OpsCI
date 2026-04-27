@@ -8,14 +8,18 @@ body {
 /* NAVBAR */
 .navbar {
   background: black;
-  padding: 15px;
-  text-align: center;
+  padding: 10px 30px; /* Plus d'espace sur les côtés */
+  display: flex;
+  justify-content: space-between; /* Pousse les éléments aux extrémités */
+  align-items: center; /* Centre verticalement */
   border-bottom: 2px solid orange;
 }
 
 .navbar h1 {
   color: orange;
   cursor: pointer;
+  margin: 0;
+  font-size: 1.8rem;
 }
 
 /* SEARCH */
@@ -143,7 +147,128 @@ body {
   display: none;
 }
 
+/* Login Page */
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  margin: 50px auto;
+  padding: 20px;
+  background: #1c1c1c;
+  border-radius: 8px;
+  color: white;
+}
 
+.login-container h2 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.input-group {
+  margin-bottom: 15px;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  background: #333;
+  color: white;
+  border: none;
+}
+
+button {
+  width: 100%;
+  padding: 10px;
+  background: orange;
+  border: none;
+  color: black;
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+}
+
+button:hover {
+  background: #e87e00;
+}
+
+p {
+  text-align: center;
+  margin-top: 20px;
+}
+
+a {
+  color: orange;
+}
+
+/* DASHBOARD SPECIFIQUE */
+#welcomeUser {
+  color: orange;
+  margin-top: 0;
+}
+
+.dashboard-actions {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#loginBtn, #dashboardBtn {
+  width: auto;
+  padding: 8px 18px;
+  font-size: 14px;
+  margin: 0;
+}
+
+.btn-logout {
+  background: #ff4d4d !important; /* Rouge pour la déconnexion */
+  color: white !important;
+}
+
+.btn-logout:hover {
+  background: #ff3333 !important;
+}
+
+/* AMELIORATION FORMULAIRES */
+.login-container a {
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+}
+
+.login-container a:hover {
+  color: white;
+}
+
+.login-container input:focus {
+  outline: 2px solid orange;
+  background: #444;
+}
+
+/* BOUTONS ACCUEIL */
+.welcome-container {
+  text-align: center;
+  padding: 40px 20px;
+  background: linear-gradient(to bottom, #1c1c1c, #0f0f0f);
+}
+
+.action-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.action-buttons button {
+  width: auto; /* Pour qu'ils ne prennent pas toute la largeur sur l'accueil */
+  padding: 12px 25px;
+  min-width: 150px;
+}
 
 /* ================== Version TP2 ==================
 /** { box-sizing: border-box; }

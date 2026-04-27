@@ -95,5 +95,17 @@ document.getElementById("search").addEventListener("input", (e) => {
   displayMovies(filtered);
 });
 
+document.addEventListener('DOMContentLoaded', () => {
+    const user = localStorage.getItem('userConnected');
+    if (user) {
+        document.getElementById("loginBtn").classList.add("hidden");
+        document.getElementById("dashboardBtn").classList.remove("hidden");
+    }
+    document.getElementById("loginBtn").onclick = () => window.location.href="/login";
+    document.getElementById("dashboardBtn").onclick = () => window.location.href="/dashboard";
+    document.getElementById("backBtn").onclick = goHome;
+    loadMovies();
+});
+
 // INIT
 loadMovies();
