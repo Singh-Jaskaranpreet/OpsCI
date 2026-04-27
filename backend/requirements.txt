@@ -4,3 +4,7 @@ python-dotenv==1.2.2
 requests==2.33.1
 pydantic==2.13.3
 urllib3==2.6.3
+
+# DB
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9

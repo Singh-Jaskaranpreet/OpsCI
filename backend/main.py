@@ -8,21 +8,17 @@ import json
 from datetime import datetime, timedelta
 import urllib3
 
-#POUR DATABASE_Films
 from database import engine, SessionLocal
 from models import Base, Movie
 
 Base.metadata.create_all(bind=engine)
 
-# Désactiver warnings SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Charger .env
 load_dotenv()
 
 app = FastAPI()
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -31,7 +27,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# CONFIG
 TMDB_TOKEN = os.getenv("TMDB_TOKEN", "").strip()
 TMDB_BASE = "https://api.themoviedb.org/3"
 TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w500"
@@ -40,7 +35,6 @@ BASE_DIR = Path(__file__).parent
 EXPORT_DIR = BASE_DIR / "exports"
 EXPORT_DIR.mkdir(exist_ok=True)
 
-# CACHE
 cache_movies = []
 cache_time = None
 CACHE_DURATION = timedelta(minutes=10)
@@ -51,7 +45,7 @@ def hello():
     return {"message": "Hello World"}
 
 
-# APPEL TMDB
+# TMDB
 def tmdb_get(path: str, params: dict | None = None) -> dict:
     if not TMDB_TOKEN:
         raise HTTPException(status_code=500, detail="TMDB_TOKEN manquant")
@@ -62,25 +56,15 @@ def tmdb_get(path: str, params: dict | None = None) -> dict:
         "accept": "application/json"
     }
 
-    try:
-        r = requests.get(url, headers=headers, params=params, timeout=10, verify=False)
+    r = requests.get(url, headers=headers, params=params, timeout=10, verify=False)
 
-        if r.status_code == 401:
-            raise HTTPException(status_code=401, detail="Clé API invalide")
+    if r.status_code != 200:
+        raise HTTPException(status_code=500, detail="Erreur TMDB")
 
-        if r.status_code == 429:
-            raise HTTPException(status_code=429, detail="Trop de requêtes (rate limit)")
-
-        if r.status_code != 200:
-            raise HTTPException(status_code=500, detail="Erreur TMDB")
-
-        return r.json()
-
-    except requests.exceptions.RequestException:
-        raise HTTPException(status_code=500, detail="Erreur réseau")
+    return r.json()
 
 
-# NORMALISATION
+# NORMALIZE
 def normalize_tmdb_movie(m: dict) -> dict:
     poster_path = m.get("poster_path")
     image_url = f"{TMDB_IMG_BASE}{poster_path}" if poster_path else ""
@@ -95,72 +79,64 @@ def normalize_tmdb_movie(m: dict) -> dict:
     }
 
 
-# ROUTE MOVIES (MAX 200)
+# MOVIES
 @app.get("/movies")
-def get_movies(limit: int = Query(default=50, ge=1, le=200)):
+def get_movies(limit: int = 10, offset: int = 0):
     db = SessionLocal()
 
-    # 1. essayer DB
-    movies = db.query(Movie).limit(limit).all()
+    total = db.query(Movie).count()
 
-    if movies:
-        return [
-            {
-                "title": m.title,
-                "description": m.description,
-                "image_url": m.image_url,
-                "year": m.year,
-                "tmdb_id": m.tmdb_id,
-                "rating": m.rating
-            }
-            for m in movies
-        ]
+    # 🔥 remplir la DB si pas assez de films
+    if total < 100:
+        page = 1
 
-    # 2. sinon appeler TMDB
-    movies_data = []
-    page = 1
-
-    while len(movies_data) < limit:
-        data = tmdb_get("/movie/popular", params={
-            "language": "fr-FR",
-            "page": page
-        })
-
-        results = data.get("results", [])
-
-        for m in results:
-            movie = normalize_tmdb_movie(m)
-
-            db_movie = Movie(
-                tmdb_id=movie["tmdb_id"],
-                title=movie["title"],
-                description=movie["description"],
-                image_url=movie["image_url"],
-                year=movie["year"],
-                rating=movie["rating"]
-            )
-
-            db.add(db_movie)
-            db.commit()
-            db.refresh(db_movie)
-
-            movies_data.append({
-                "title": db_movie.title,
-                "description": db_movie.description,
-                "image_url": db_movie.image_url,
-                "year": db_movie.year,
-                "tmdb_id": db_movie.tmdb_id,
-                "rating": db_movie.rating
+        while page <= 10:  # ≈ 200 films
+            data = tmdb_get("/movie/popular", params={
+                "language": "fr-FR",
+                "page": page
             })
 
-        page += 1
+            results = data.get("results", [])
 
-        if page > 5:
-            break
+            for m in results:
+                movie = normalize_tmdb_movie(m)
 
-    return movies_data[:limit]
+                # éviter doublons
+                exists = db.query(Movie).filter_by(tmdb_id=movie["tmdb_id"]).first()
+                if exists:
+                    continue
 
-# EXPORT JSON
+                db_movie = Movie(
+                    tmdb_id=movie["tmdb_id"],
+                    title=movie["title"],
+                    description=movie["description"],
+                    image_url=movie["image_url"],
+                    year=movie["year"],
+                    rating=movie["rating"]
+                )
+
+                db.add(db_movie)
+
+            db.commit()
+            page += 1
+
+    # pagination
+    movies = db.query(Movie).offset(offset).limit(limit).all()
+
+    return [
+        {
+            "title": m.title,
+            "description": m.description,
+            "image_url": m.image_url,
+            "year": m.year,
+            "tmdb_id": m.tmdb_id,
+            "rating": m.rating
+        }
+        for m in movies
+    ]
+
+
+# EXPORT
 @app.get("/export/movies.json")
 def export_movies(limit: int = Query(default=100, ge=1, le=200)):
     movies = []
@@ -196,9 +172,7 @@ def export_movies(limit: int = Query(default=100, ge=1, le=200)):
     }
 
 
-
-
-#trendings 
+# TRENDING
 @app.get("/movies/trending")
 def get_trending(limit: int = Query(default=20, ge=1, le=100)):
     data = tmdb_get("/trending/movie/week", params={"language": "fr-FR"})
@@ -209,7 +183,7 @@ def get_trending(limit: int = Query(default=20, ge=1, le=100)):
     return movies[:limit]
 
 
-#trailers 
+# TRAILER
 @app.get("/movies/{movie_id}/trailer")
 def get_trailer(movie_id: int):
     data = tmdb_get(f"/movie/{movie_id}/videos")
