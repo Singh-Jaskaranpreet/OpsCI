@@ -66,10 +66,14 @@ async function showMovie(movie) {
 
 // BACK
 function goHome() {
+  const iframe = document.getElementById("trailerIframe");
+  iframe.classList.add("hidden");
+  iframe.src = "";
+
   document.getElementById("movieView").classList.add("hidden");
   document.getElementById("movies").classList.remove("hidden");
   document.getElementById("loadMore").classList.remove("hidden");
-
+  
   document.getElementById("trailerThumbnail").src = "";
 }
 
