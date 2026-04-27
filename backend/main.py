@@ -8,6 +8,12 @@ import json
 from datetime import datetime, timedelta
 import urllib3
 
+#POUR DATABASE_Films
+from database import engine, SessionLocal
+from models import Base, Movie
+
+Base.metadata.create_all(bind=engine)
+
 # Désactiver warnings SSL
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -92,17 +98,29 @@ def normalize_tmdb_movie(m: dict) -> dict:
 # ROUTE MOVIES (MAX 200)
 @app.get("/movies")
 def get_movies(limit: int = Query(default=50, ge=1, le=200)):
-    global cache_movies, cache_time
+    db = SessionLocal()
 
-    # CACHE seulement si suffisant
-    if cache_movies and cache_time:
-        if datetime.now() - cache_time < CACHE_DURATION and len(cache_movies) >= limit:
-            return cache_movies[:limit]
+    # 1. essayer DB
+    movies = db.query(Movie).limit(limit).all()
 
-    movies = []
+    if movies:
+        return [
+            {
+                "title": m.title,
+                "description": m.description,
+                "image_url": m.image_url,
+                "year": m.year,
+                "tmdb_id": m.tmdb_id,
+                "rating": m.rating
+            }
+            for m in movies
+        ]
+
+    # 2. sinon appeler TMDB
+    movies_data = []
     page = 1
 
-    while len(movies) < limit:
+    while len(movies_data) < limit:
         data = tmdb_get("/movie/popular", params={
             "language": "fr-FR",
             "page": page
@@ -110,20 +128,37 @@ def get_movies(limit: int = Query(default=50, ge=1, le=200)):
 
         results = data.get("results", [])
 
-        if not results:
-            break
+        for m in results:
+            movie = normalize_tmdb_movie(m)
 
-        movies.extend([normalize_tmdb_movie(m) for m in results])
+            db_movie = Movie(
+                tmdb_id=movie["tmdb_id"],
+                title=movie["title"],
+                description=movie["description"],
+                image_url=movie["image_url"],
+                year=movie["year"],
+                rating=movie["rating"]
+            )
+
+            db.add(db_movie)
+            db.commit()
+            db.refresh(db_movie)
+
+            movies_data.append({
+                "title": db_movie.title,
+                "description": db_movie.description,
+                "image_url": db_movie.image_url,
+                "year": db_movie.year,
+                "tmdb_id": db_movie.tmdb_id,
+                "rating": db_movie.rating
+            })
+
         page += 1
 
-        if page > 10:  # sécurité (10 pages = 200 films)
+        if page > 5:
             break
 
-    cache_movies = movies
-    cache_time = datetime.now()
-
-    return movies[:limit]
-
+    return movies_data[:limit]
 
 # EXPORT JSON
 @app.get("/export/movies.json")
