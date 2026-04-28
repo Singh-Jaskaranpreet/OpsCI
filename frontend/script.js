@@ -43,6 +43,26 @@ function displayMovies(movies) {
 
 // SHOW MOVIE
 async function showMovie(movie) {
+
+  let favContainer = document.getElementById("favContainer");
+  if (!favContainer) {
+      favContainer = document.createElement("div");
+      favContainer.id = "favContainer";
+      document.getElementById("movieView").appendChild(favContainer);
+  }
+  
+  const user = localStorage.getItem('userConnected');
+  
+  if (user) {
+      favContainer.innerHTML = `<button id="favBtn" class="btn-fav">⭐ Ajouter aux favoris</button>`;
+      document.getElementById("favBtn").onclick = () => {
+          // On appelle ta fonction addFav avec les données du film actuel
+          addFav(movie.tmdb_id, movie.title, movie.image_url);
+      };
+  } else {
+      favContainer.innerHTML = `<p style="color: gray;">Connectez-vous pour ajouter en favori</p>`;
+  }
+  
   document.getElementById("movies").classList.add("hidden");
   document.getElementById("loadMore").classList.add("hidden");
   document.getElementById("movieView").classList.remove("hidden");
@@ -82,8 +102,50 @@ function goHome() {
   iframe.classList.add("hidden");
 }
 
+async function addFav(e, id, title, img) {
+    e.stopPropagation();
+    const user = localStorage.getItem('userConnected');
+    if(!user) return alert("Connectez-vous !");
+    await fetch('/favorites/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: user, tmdb_id: id, title: title, image_url: img})
+    });
+    alert("Ajouté !");
+}
+
+function checkUser() {
+    const user = localStorage.getItem('userConnected');
+    if(user) {
+        document.getElementById('loginBtn').classList.add('hidden');
+        const dash = document.getElementById('dashboardBtn');
+        dash.classList.remove('hidden');
+        dash.onclick = () => window.location.href="/dashboard";
+    } else {
+        document.getElementById('loginBtn').onclick = () => window.location.href="/login";
+    }
+}
+
 // EVENTS
 document.addEventListener('DOMContentLoaded', () => {
+
+  const user = localStorage.getItem('userConnected');
+  const loginBtn = document.getElementById('loginBtn');
+  const dashBtn = document.getElementById('dashboardBtn');
+
+  // Gestion de l'affichage Login / Dashboard
+  if(user) {
+      if(loginBtn) loginBtn.classList.add('hidden');
+      if(dashBtn) {
+          dashBtn.classList.remove('hidden');
+          dashBtn.onclick = () => window.location.href = "/dashboard";
+      }
+  } else {
+      if(loginBtn) {
+          loginBtn.classList.remove('hidden');
+          loginBtn.onclick = () => window.location.href = "/login";
+      }
+  }
 
   document.getElementById("backBtn").onclick = goHome;
   document.getElementById("loadMore").onclick = loadMovies;

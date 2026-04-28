@@ -1,5 +1,8 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Form, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
 import os
 import requests
@@ -9,7 +12,9 @@ from datetime import datetime, timedelta
 import urllib3
 
 from database import engine, SessionLocal
-from models import Base, Movie
+from models import Base, Movie, User, Favorite
+from sqlalchemy.orm import Session
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -35,15 +40,23 @@ BASE_DIR = Path(__file__).parent
 EXPORT_DIR = BASE_DIR / "exports"
 EXPORT_DIR.mkdir(exist_ok=True)
 
+# Utilise ".." pour dire : "sort du dossier backend et cherche frontend juste à côté"
+templates = Jinja2Templates(directory="../frontend")
+app.mount("/static", StaticFiles(directory="../frontend"), name="static")
+
 cache_movies = []
 cache_time = None
 CACHE_DURATION = timedelta(minutes=10)
-
+templates = Jinja2Templates(directory="../frontend")
 
 @app.get("/hello")
 def hello():
     return {"message": "Hello World"}
 
+def get_db():
+    db = SessionLocal()
+    try: yield db
+    finally: db.close()
 
 # TMDB
 def tmdb_get(path: str, params: dict | None = None) -> dict:
@@ -197,3 +210,61 @@ def get_trailer(movie_id: int):
             }
 
     return {"url": None}
+
+# --- ROUTES AUTH ---
+@app.post("/register")
+async def register(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    # Vérifie si l'utilisateur existe déjà
+    user_exists = db.query(User).filter(User.username == username).first()
+    if user_exists:
+        # Redirige vers register avec un paramètre d'erreur si tu veux
+        return RedirectResponse(url="/register?error=exists", status_code=303)
+    
+    # Création du nouvel utilisateur
+    new_user = User(username=username, password=password)
+    db.add(new_user)
+    db.commit()
+    print(f"Succès : Utilisateur {username} créé.")
+    return RedirectResponse(url="/login", status_code=303)
+
+@app.post("/login")
+async def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username, User.password == password).first()
+    
+    if not user:
+        # Si pas trouvé, on renvoie une erreur 401 que ton JS attrapera
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    
+    return {"status": "ok", "username": username}
+# --- ROUTES FAVORIS ---
+@app.post("/favorites/add")
+async def add_fav(data: dict, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == data['username']).first()
+    if not user: return {"error": "User not found"}
+    exists = db.query(Favorite).filter(Favorite.user_id == user.id, Favorite.movie_id == data['tmdb_id']).first()
+    if not exists:
+        db.add(Favorite(movie_id=data['tmdb_id'], title=data['title'], image_url=data['image_url'], user_id=user.id))
+        db.commit()
+    return {"status": "ok"}
+
+@app.get("/api/favorites/{username}")
+async def get_favs(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    return user.favorites if user else []
+
+@app.get("/", response_class=HTMLResponse)
+async def home(request: Request):
+    # On utilise les arguments nommés 'request' et 'name'
+    return templates.TemplateResponse(request=request, name="index.html")
+
+@app.get("/login", response_class=HTMLResponse)
+async def s_login(request: Request):
+    return templates.TemplateResponse(request=request, name="login.html")
+
+@app.get("/register", response_class=HTMLResponse)
+async def s_register(request: Request):
+    return templates.TemplateResponse(request=request, name="register.html")
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    return templates.TemplateResponse(request=request, name="dashboard.html")
