@@ -8,27 +8,45 @@
 <body>
   <div class="login-container">
     <h2>Connexion</h2>
+
     <input type="text" id="username" placeholder="Nom d'utilisateur">
     <input type="password" id="password" placeholder="Mot de passe">
+
     <button onclick="connecter()">Se connecter</button>
-    <p>Pas de compte ? <a href="/register">S'inscrire ici</a></p>
-    <p><a href="/">Retour à l'accueil</a></p>
+
+    <!-- 🔥 FIX liens (pas /login ou /register car frontend séparé) -->
+    <p>Pas de compte ? <a href="register.html">S'inscrire ici</a></p>
+    <p><a href="index.html">Retour à l'accueil</a></p>
   </div>
 
   <script>
     async function connecter() {
       const u = document.getElementById('username').value;
       const p = document.getElementById('password').value;
+
       const form = new FormData();
       form.append('username', u);
       form.append('password', p);
 
-      const res = await fetch('/login', { method: 'POST', body: form });
-      if (res.ok) {
-        localStorage.setItem('userConnected', u);
-        window.location.href = "/dashboard";
-      } else {
-        alert("Identifiants incorrects (SQL)");
+      try {
+        // 🔥 FIX IMPORTANT : appel backend
+        const res = await fetch('http://localhost:8000/login', {
+          method: 'POST',
+          body: form
+        });
+
+        if (res.ok) {
+          localStorage.setItem('userConnected', u);
+
+          // 🔥 FIX redirect (pas /dashboard sinon erreur)
+          window.location.href = "dashboard.html";
+        } else {
+          alert("Identifiants incorrects");
+        }
+
+      } catch (err) {
+        console.error(err);
+        alert("Erreur serveur");
       }
     }
   </script>

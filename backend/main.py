@@ -5,22 +5,20 @@ from sqlalchemy.orm import Session
 from database import engine, SessionLocal
 from models import Base, Movie, User, Favorite
 
-# CREATE APP AVANT TOUT
 app = FastAPI()
 
-# CORS JUSTE APRÈS
+# 🔥 CORS FIX
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000"],  # IMPORTANT
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# create tables
 Base.metadata.create_all(bind=engine)
 
-# DB session
+
 def get_db():
     db = SessionLocal()
     try:
@@ -28,9 +26,8 @@ def get_db():
     finally:
         db.close()
 
-# -------------------
-# MOVIES
-# -------------------
+
+# ---------------- MOVIES ----------------
 @app.get("/movies")
 def get_movies(limit: int = 10, offset: int = 0, db: Session = Depends(get_db)):
     movies = db.query(Movie).offset(offset).limit(limit).all()
@@ -42,21 +39,20 @@ def get_movies(limit: int = 10, offset: int = 0, db: Session = Depends(get_db)):
             "image_url": m.image_url,
             "year": m.year,
             "tmdb_id": m.tmdb_id,
-            "rating": m.rating
+            "rating": m.rating,
+            "trailer_url": m.trailer_url  # 🔥 FIX
         }
         for m in movies
     ]
 
-# -------------------
-# SEARCH
-# -------------------
+
+# ---------------- SEARCH ----------------
 @app.get("/search")
 def search(query: str, db: Session = Depends(get_db)):
     return db.query(Movie).filter(Movie.title.ilike(f"%{query}%")).all()
 
-# -------------------
-# AUTH
-# -------------------
+
+# ---------------- AUTH ----------------
 @app.post("/register")
 def register(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == username).first():
@@ -64,7 +60,9 @@ def register(username: str = Form(...), password: str = Form(...), db: Session =
 
     db.add(User(username=username, password=password))
     db.commit()
+
     return {"status": "created"}
+
 
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
@@ -78,9 +76,8 @@ def login(username: str = Form(...), password: str = Form(...), db: Session = De
 
     return {"status": "ok", "username": username}
 
-# -------------------
-# FAVORITES
-# -------------------
+
+# ---------------- FAVORITES ----------------
 @app.post("/favorites/add")
 def add_fav(data: dict, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data['username']).first()
@@ -103,6 +100,7 @@ def add_fav(data: dict, db: Session = Depends(get_db)):
         db.commit()
 
     return {"status": "ok"}
+
 
 @app.get("/api/favorites/{username}")
 def get_favs(username: str, db: Session = Depends(get_db)):

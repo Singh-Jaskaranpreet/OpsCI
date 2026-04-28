@@ -6,44 +6,61 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="navbar">
-    <h1 onclick="window.location.href='/'" style="cursor:pointer">SINGHFLIX</h1>
-    <button id="logoutBtn" class="btn-logout">Se déconnecter</button>
-  </header>
 
-  <div class="container">
-    <h2 id="userInfo">Mes Favoris</h2>
-    <div id="favs" class="movies-grid"></div>
-  </div>
+<header class="navbar">
+  <h1 onclick="window.location.href='/'" style="cursor:pointer">SINGHFLIX</h1>
+  <button id="logoutBtn" class="btn-logout">Se déconnecter</button>
+</header>
 
-  <script>
-    const user = localStorage.getItem('userConnected');
-    if(!user) window.location.href="/login";
-    
-    document.getElementById('userInfo').innerText = "Favoris de " + user;
-    
-    // Récupération des favoris depuis l'API PostgreSQL
-    fetch('/api/favorites/' + user)
-      .then(r => r.json())
-      .then(data => {
-        const grid = document.getElementById('favs');
-        if (data.length === 0) {
-            grid.innerHTML = "<p>Vous n'avez pas encore de favoris.</p>";
-            return;
-        }
-        data.forEach(f => {
-            grid.innerHTML += `
-                <div class="card">
-                    <img src="${f.image_url}" alt="${f.title}">
-                    <h3>${f.title}</h3>
-                </div>`;
-        });
-      });
+<div class="container">
+  <h2 id="userInfo">Mes Favoris</h2>
+  <div id="favs" class="movies-grid"></div>
+</div>
 
-    document.getElementById('logoutBtn').onclick = () => {
-        localStorage.removeItem('userConnected');
-        window.location.href="/";
-    };
-  </script>
+<script>
+const user = localStorage.getItem('userConnected');
+
+if (!user || user === "null" || user === "undefined") {
+  window.location.href = "/login";
+}
+
+document.getElementById('userInfo').innerText = "Favoris de " + user;
+
+fetch('/api/favorites/' + user)
+  .then(r => {
+    if (!r.ok) throw new Error("Erreur API");
+    return r.json();
+  })
+  .then(data => {
+    const grid = document.getElementById('favs');
+
+    grid.innerHTML = "";
+
+    if (!Array.isArray(data) || data.length === 0) {
+      grid.innerHTML = "<p>Aucun favori pour le moment.</p>";
+      return;
+    }
+
+    data.forEach(f => {
+      grid.innerHTML += `
+        <div class="card">
+          <img src="${f.image_url || ''}" alt="${f.title || 'film'}">
+          <h3>${f.title || 'Sans titre'}</h3>
+        </div>
+      `;
+    });
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById('favs').innerHTML =
+      "<p>Erreur chargement favoris</p>";
+  });
+
+document.getElementById('logoutBtn').onclick = () => {
+  localStorage.removeItem('userConnected');
+  window.location.href = "/";
+};
+</script>
+
 </body>
 </html>

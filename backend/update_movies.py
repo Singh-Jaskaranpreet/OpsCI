@@ -2,22 +2,19 @@ import requests
 import os
 from dotenv import load_dotenv
 
-from database import SessionLocal
-from models import Movie
+from database import SessionLocal, engine
+from models import Movie,Base
 
 load_dotenv()
+Base.metadata.create_all(bind=engine)
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN")
 
+
 def tmdb_get(endpoint, params=None):
     url = f"https://api.themoviedb.org/3{endpoint}"
-
-    headers = {
-        "Authorization": f"Bearer {TMDB_TOKEN}"
-    }
-
-    response = requests.get(url, headers=headers, params=params)
-    return response.json()
+    headers = {"Authorization": f"Bearer {TMDB_TOKEN}"}
+    return requests.get(url, headers=headers, params=params).json()
 
 
 def normalize_tmdb_movie(m):
@@ -31,24 +28,32 @@ def normalize_tmdb_movie(m):
     }
 
 
+# 🔥 NEW
+def get_trailer(tmdb_id):
+    data = tmdb_get(f"/movie/{tmdb_id}/videos")
+
+    for v in data.get("results", []):
+        if v["type"] == "Trailer" and v["site"] == "YouTube":
+            return f"https://www.youtube.com/watch?v={v['key']}"
+
+    return None
+
+
 def update_movies():
     db = SessionLocal()
 
-    print("update movies...")
-
     page = 1
-    added = 0
 
     while page <= 5:
-        data = tmdb_get("/movie/popular", params={
+        data = tmdb_get("/movie/popular", {
             "language": "fr-FR",
             "page": page
         })
 
-        results = data.get("results", [])
+        for m in data.get("results", []):
 
-        for m in results:
             movie = normalize_tmdb_movie(m)
+            trailer = get_trailer(movie["tmdb_id"])  # 🔥
 
             exists = db.query(Movie).filter_by(tmdb_id=movie["tmdb_id"]).first()
 
@@ -58,6 +63,7 @@ def update_movies():
                 exists.image_url = movie["image_url"]
                 exists.year = movie["year"]
                 exists.rating = movie["rating"]
+                exists.trailer_url = trailer
             else:
                 db.add(Movie(
                     tmdb_id=movie["tmdb_id"],
@@ -65,16 +71,15 @@ def update_movies():
                     description=movie["description"],
                     image_url=movie["image_url"],
                     year=movie["year"],
-                    rating=movie["rating"]
+                    rating=movie["rating"],
+                    trailer_url=trailer
                 ))
-                added += 1
 
         db.commit()
         page += 1
 
     db.close()
-
-    print(f"done. {added} new movies")
+    print("update done")
 
 
 if __name__ == "__main__":
