@@ -1,13 +1,19 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://localhost:8000";
 
 let offset = 0;
 const LIMIT = 10;
 
+console.log("JS LOADED");
+
+// ---------------------
 // LOAD MOVIES
+// ---------------------
 async function loadMovies() {
   try {
     const res = await fetch(`${API_URL}/movies?limit=${LIMIT}&offset=${offset}`);
     const movies = await res.json();
+
+    console.log("movies:", movies);
 
     if (!movies.length) {
       console.log("Plus de films");
@@ -18,11 +24,13 @@ async function loadMovies() {
     offset += LIMIT;
 
   } catch (error) {
-    console.error("Erreur:", error);
+    console.error("Erreur loadMovies:", error);
   }
 }
 
-// DISPLAY
+// ---------------------
+// DISPLAY MOVIES
+// ---------------------
 function displayMovies(movies) {
   const container = document.getElementById("movies");
 
@@ -41,28 +49,36 @@ function displayMovies(movies) {
   });
 }
 
+// ---------------------
 // SHOW MOVIE
-async function showMovie(movie) {
+// ---------------------
+function showMovie(movie) {
 
   let favContainer = document.getElementById("favContainer");
+
   if (!favContainer) {
-      favContainer = document.createElement("div");
-      favContainer.id = "favContainer";
-      document.getElementById("movieView").appendChild(favContainer);
+    favContainer = document.createElement("div");
+    favContainer.id = "favContainer";
+    document.getElementById("movieView").appendChild(favContainer);
   }
-  
+
   const user = localStorage.getItem('userConnected');
-  
+
   if (user) {
-      favContainer.innerHTML = `<button id="favBtn" class="btn-fav">⭐ Ajouter aux favoris</button>`;
-      document.getElementById("favBtn").onclick = () => {
-          // On appelle ta fonction addFav avec les données du film actuel
-          addFav(movie.tmdb_id, movie.title, movie.image_url);
-      };
+    favContainer.innerHTML = `
+      <button id="favBtn" class="btn-fav">⭐ Ajouter aux favoris</button>
+    `;
+
+    document.getElementById("favBtn").onclick = () => {
+      addFav(movie.tmdb_id, movie.title, movie.image_url);
+    };
+
   } else {
-      favContainer.innerHTML = `<p style="color: gray;">Connectez-vous pour ajouter en favori</p>`;
+    favContainer.innerHTML = `
+      <p style="color: gray;">Connectez-vous pour ajouter en favori</p>
+    `;
   }
-  
+
   document.getElementById("movies").classList.add("hidden");
   document.getElementById("loadMore").classList.add("hidden");
   document.getElementById("movieView").classList.remove("hidden");
@@ -72,87 +88,76 @@ async function showMovie(movie) {
   document.getElementById("rating").innerText = "⭐ " + (movie.rating || "N/A");
   document.getElementById("desc").innerText = movie.description || "";
   document.getElementById("movieImage").src = movie.image_url || "";
-
-  const iframe = document.getElementById("trailerIframe");
-  iframe.classList.add("hidden");
-  iframe.src = "";
-
-  try {
-    const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/trailer`);
-    const data = await res.json();
-
-    if (data.url && data.url.includes("v=")) {
-      const videoId = data.url.split("v=")[1];
-      iframe.src = `https://www.youtube.com/embed/${videoId}`;
-      iframe.classList.remove("hidden");
-    }
-  } catch (error) {
-    console.error("Erreur trailer:", error);
-  }
 }
 
-// BACK
+// ---------------------
+// BACK HOME
+// ---------------------
 function goHome() {
   document.getElementById("movieView").classList.add("hidden");
   document.getElementById("movies").classList.remove("hidden");
   document.getElementById("loadMore").classList.remove("hidden");
-
-  const iframe = document.getElementById("trailerIframe");
-  iframe.src = "";
-  iframe.classList.add("hidden");
 }
 
-async function addFav(e, id, title, img) {
-    e.stopPropagation();
-    const user = localStorage.getItem('userConnected');
-    if(!user) return alert("Connectez-vous !");
-    await fetch('/favorites/add', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({username: user, tmdb_id: id, title: title, image_url: img})
+// ---------------------
+// ADD FAVORITE (FIXED)
+// ---------------------
+async function addFav(id, title, img) {
+  const user = localStorage.getItem('userConnected');
+
+  if (!user) {
+    alert("Connectez-vous !");
+    return;
+  }
+
+  try {
+    await fetch(`${API_URL}/favorites/add`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: user,
+        tmdb_id: id,
+        title: title,
+        image_url: img
+      })
     });
+
     alert("Ajouté !");
+  } catch (err) {
+    console.error("Erreur addFav:", err);
+  }
 }
 
-function checkUser() {
-    const user = localStorage.getItem('userConnected');
-    if(user) {
-        document.getElementById('loginBtn').classList.add('hidden');
-        const dash = document.getElementById('dashboardBtn');
-        dash.classList.remove('hidden');
-        dash.onclick = () => window.location.href="/dashboard";
-    } else {
-        document.getElementById('loginBtn').onclick = () => window.location.href="/login";
-    }
-}
-
-// EVENTS
+// ---------------------
+// INIT UI
+// ---------------------
 document.addEventListener('DOMContentLoaded', () => {
 
   const user = localStorage.getItem('userConnected');
   const loginBtn = document.getElementById('loginBtn');
   const dashBtn = document.getElementById('dashboardBtn');
 
-  // Gestion de l'affichage Login / Dashboard
-  if(user) {
-      if(loginBtn) loginBtn.classList.add('hidden');
-      if(dashBtn) {
-          dashBtn.classList.remove('hidden');
-          dashBtn.onclick = () => window.location.href = "/dashboard";
-      }
+  if (user) {
+    if (loginBtn) loginBtn.classList.add('hidden');
+
+    if (dashBtn) {
+      dashBtn.classList.remove('hidden');
+      dashBtn.onclick = () => window.location.href = "/dashboard";
+    }
+
   } else {
-      if(loginBtn) {
-          loginBtn.classList.remove('hidden');
-          loginBtn.onclick = () => window.location.href = "/login";
-      }
+    if (loginBtn) {
+      loginBtn.classList.remove('hidden');
+      loginBtn.onclick = () => window.location.href = "/login";
+    }
   }
 
   document.getElementById("backBtn").onclick = goHome;
   document.getElementById("loadMore").onclick = loadMovies;
 
+  // search simple
   document.getElementById("search").addEventListener("input", (e) => {
     const q = e.target.value.toLowerCase();
-
     const cards = document.querySelectorAll(".card");
 
     cards.forEach(card => {

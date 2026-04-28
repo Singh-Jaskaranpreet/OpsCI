@@ -1,16 +1,45 @@
+import requests
+import os
+from dotenv import load_dotenv
+
 from database import SessionLocal
 from models import Movie
-from main import tmdb_get, normalize_tmdb_movie
+
+load_dotenv()
+
+TMDB_TOKEN = os.getenv("TMDB_TOKEN")
+
+def tmdb_get(endpoint, params=None):
+    url = f"https://api.themoviedb.org/3{endpoint}"
+
+    headers = {
+        "Authorization": f"Bearer {TMDB_TOKEN}"
+    }
+
+    response = requests.get(url, headers=headers, params=params)
+    return response.json()
+
+
+def normalize_tmdb_movie(m):
+    return {
+        "tmdb_id": m.get("id"),
+        "title": m.get("title"),
+        "description": m.get("overview"),
+        "image_url": f"https://image.tmdb.org/t/p/w500{m.get('poster_path')}" if m.get("poster_path") else "",
+        "year": m.get("release_date", "")[:4],
+        "rating": m.get("vote_average")
+    }
+
 
 def update_movies():
     db = SessionLocal()
 
-    print("Mise à jour des films...")
+    print("update movies...")
 
     page = 1
     added = 0
 
-    while page <= 5:  # ≈ 100 films
+    while page <= 5:
         data = tmdb_get("/movie/popular", params={
             "language": "fr-FR",
             "page": page
@@ -21,27 +50,23 @@ def update_movies():
         for m in results:
             movie = normalize_tmdb_movie(m)
 
-            # Vérifier si déjà en DB
             exists = db.query(Movie).filter_by(tmdb_id=movie["tmdb_id"]).first()
 
             if exists:
-                # Mise à jour (optionnelle)
                 exists.title = movie["title"]
                 exists.description = movie["description"]
                 exists.image_url = movie["image_url"]
                 exists.year = movie["year"]
                 exists.rating = movie["rating"]
             else:
-                # Nouveau film
-                db_movie = Movie(
+                db.add(Movie(
                     tmdb_id=movie["tmdb_id"],
                     title=movie["title"],
                     description=movie["description"],
                     image_url=movie["image_url"],
                     year=movie["year"],
                     rating=movie["rating"]
-                )
-                db.add(db_movie)
+                ))
                 added += 1
 
         db.commit()
@@ -49,7 +74,7 @@ def update_movies():
 
     db.close()
 
-    print(f"Update terminé. {added} nouveaux films ajoutés.")
+    print(f"done. {added} new movies")
 
 
 if __name__ == "__main__":
