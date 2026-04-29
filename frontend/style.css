@@ -161,7 +161,7 @@ body {
 #backBtn {
   position: absolute;
   top: 20px;
-  left: 20px;
+  right: 20px;
   width: auto;
   padding: 10px 15px;
   background: orange;
