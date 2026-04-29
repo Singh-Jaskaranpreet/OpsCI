@@ -45,7 +45,7 @@ function renderMovieCard(movie, options = {}) {
       <h3>${movie.title || 'No title'}</h3>
       <div class="card-meta">
         <p>Année de sortie : ${movie.year || 'N/A'}</p>
-        <p>IMDb : ${movie.rating || movie.vote_average || 'N/A'}</p>
+        <p>TMDB : ${movie.rating || movie.vote_average || 'N/A'}</p>
         ${info ? `<p class="reco-info">${info}</p>` : ''}
       </div>
     </div>
@@ -85,7 +85,7 @@ async function showMovie(movie) {
   }
   
   document.getElementById("year").innerText = "Année de sortie : " + (movie.year || "N/A");
-  document.getElementById("rating").innerText = "IMDb rating : " + (movie.rating || "N/A");
+  document.getElementById("rating").innerText = "TMDB rating : " + (movie.rating || "N/A");
   document.getElementById("desc").innerText = movie.description || "";
   document.getElementById("movieImage").src = movie.image_url || "";
   
@@ -106,7 +106,6 @@ async function showMovie(movie) {
     if (checkData.is_favorite) {
       btn.innerText = "❤️ Dans tes favoris";
       btn.style.backgroundColor = "#e50914"; // Rouge Netflix
-      btn.onclick = () => retirerDesFavoris(movie.tmdb_id);
     } else {
       btn.innerText = "⭐ Ajouter aux favoris";
       btn.onclick = () => ajouterAuxFavoris(movie.tmdb_id, movie.title, movie.image_url);
@@ -139,18 +138,36 @@ async function showMovie(movie) {
 
 // BACK
 function goHome() {
-  const movieView = document.getElementById("movieView");
-  const searchFilters = document.getElementById("searchFilters");
+  // 1. On cache la vue détail du film
+  document.getElementById("movieView").classList.add("hidden");
 
-  if (movieView) movieView.classList.add("hidden");
-  if (searchFilters) searchFilters.classList.remove("hidden");
-  showView(currentView);
-
+  // 2. On arrête et cache le trailer YouTube
   const iframe = document.getElementById("trailerIframe");
   if (iframe) {
     iframe.src = "";
     iframe.classList.add("hidden");
   }
+
+  // 3. REVENIR À LA VUE CATALOGUE (Onglets)
+  // On cache toutes les vues
+  document.querySelectorAll('.app-view').forEach(view => view.classList.add('hidden'));
+  
+  // On réaffiche uniquement le catalogue (la grille de films principale)
+  const catalog = document.getElementById("catalogView");
+  if (catalog) {
+      catalog.classList.remove("hidden");
+  }
+
+  // 4. On réactive le bouton "Films" dans la barre d'onglets
+  document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+  const catalogBtn = document.querySelector('[data-view="catalog"]');
+  if (catalogBtn) {
+      catalogBtn.classList.add('active');
+  }
+
+  // 5. On réaffiche les filtres et le bouton "Charger plus"
+  document.getElementById("searchFilters").classList.remove("hidden");
+  document.getElementById("loadMore").classList.remove("hidden");
 }
 
 async function retirerDesFavoris(id) {
@@ -180,7 +197,6 @@ async function retirerDesFavoris(id) {
         btn.onclick = () => ajouterAuxFavoris(id, currentTitle, currentImage);
       }
 
-      afficherLesSuggestions(data.recommendations || []);
       await refreshHomeUserSections();
     } else {
       alert(data.message || "Erreur lors de la suppression");
@@ -538,13 +554,22 @@ async function showView(viewName) {
     return;
   }
 
+
+  const movieView = document.getElementById("movieView");
+  if (movieView) movieView.classList.add("hidden");
+  
+  const iframe = document.getElementById("trailerIframe");
+  if (iframe) iframe.src = "";
+
   document.querySelectorAll(".app-view").forEach(view => view.classList.add("hidden"));
+  
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.view === viewName);
   });
 
   const searchFilters = document.getElementById("searchFilters");
   if (searchFilters) searchFilters.classList.toggle("hidden", viewName !== "catalog");
+
 
   if (viewName === "catalog") {
     document.getElementById("catalogView").classList.remove("hidden");
