@@ -278,3 +278,18 @@ def get_reco(username: str, db: Session = Depends(get_db)):
     return {
         **get_recommendations_from_service(user.id)
     }
+
+@app.get("/movies/{movie_id}/recommendations")
+def get_movie_recommendations_proxy(movie_id: int, db: Session = Depends(get_db)):
+    # Le Backend appelle lui-même le service Recom (port 8001)
+    recom_url = f"{RECOMMENDATION_URL}/recommendations/movie/{movie_id}"
+    
+    try:
+        response = requests.get(recom_url, timeout=5)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            raise HTTPException(status_code=500, detail="Erreur du service de recommandation")
+    except Exception as e:
+        # Si le service 8001 est éteint, on renvoie une liste vide ou un message propre
+        return {"status": "error", "recommendations": [], "message": str(e)}

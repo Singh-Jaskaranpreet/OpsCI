@@ -134,6 +134,19 @@ async function showMovie(movie) {
   } catch (error) {
     console.error("Erreur trailer:", error);
   }
+
+  try {
+      // ON APPELLE LE PORT 8000 (API_URL) au lieu de 8001
+      const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/recommendations`);
+      const data = await res.json();
+
+      if (data.recommendations) {
+          afficherLesSuggestions(data.recommendations);
+      }
+  } catch (e) {
+      console.error("Erreur via le proxy backend:", e);
+  }
+
 }
 
 // BACK
@@ -232,13 +245,13 @@ async function ajouterAuxFavoris(id, title, imageUrl) {
         btn.innerText = "❤️ Dans tes favoris";
         btn.style.backgroundColor = "#e50914";
       }
-
+      /*
       // 2. AFFICHAGE DES RECOMMANDATIONS
       if (data.recommendations && data.recommendations.length > 0) {
         afficherLesSuggestions(data.recommendations);
       } else {
         alert("Ajouté avec succès !");
-      }
+      }*/
       await refreshHomeUserSections();
     } else {
       alert(data.message || "Erreur lors de l'ajout");
@@ -434,22 +447,29 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
     // Si on ne le trouve pas (par exemple sur l'accueil), on ne fait rien 
     // ou on cherche un autre endroit spécifique.
     if (!recoDiv) return;
+    let titreDynamique = "Suggestions pour vous"; 
+  
 
     if (!movies.length) {
       recoDiv.innerHTML = `
         <div id="reco-section" style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
-          <h2 style="color: #e50914;">Suggestions pour vous</h2>
+          <h2 style="color: #e50914;">Suggestions</h2>
           <p class="empty-message">Aucune recommandation disponible pour le moment.</p>
         </div>
       `;
       return;
     }
 
+    if (movies[0].info) {
+        // Si le backend a envoyé une info (ex: "Similaire à Batman" ou "Basé sur Action")
+        titreDynamique = movies[0].info; 
+    }
+
     // 2. On utilise "=" ici, mais ça ne videra QUE la zone "reco-container"
     // Le reste de ta page (films favoris, menu) restera intact.
     let html = `
         <div id="reco-section" style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
-            <h2 style="color: #e50914;">Suggestions pour vous</h2>
+            <h2 style="color: #e50914;">${titreDynamique}</h2>
             <div class="movies-grid" style="display: flex; gap: 20px; overflow-x: auto; padding: 20px 0;">
     `;
 
@@ -464,7 +484,7 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
             year: m.year || "",
             genre: m.genre || m.genres || "",
             trailer_url: m.trailer_url || "",
-            info: m.info || ""
+            info: ""//m.info || ""
         };
         const movieString = JSON.stringify(movieData).replace(/"/g, '&quot;');
 

@@ -126,7 +126,7 @@ def calculate_recommendations(favs, db: Session):
 
     results = []
     for score, matched_favorites, rating, movie, matched_genres in scored_movies[:RECOMMENDATION_LIMIT]:
-        info_label = f"Similaire à vos favoris : {', '.join(matched_genres)}"
+        info_label = f"Parce que vous aimez : {', '.join(matched_genres)}"
         formatted = format_movie(movie, info_label)
         formatted["similarity_score"] = score
         formatted["matched_favorites"] = matched_favorites
@@ -169,6 +169,50 @@ def update_recommendations(user_id: int, db: Session = Depends(get_db)):
         "cached": False,
         "recommendations": recommendations
     }
+
+# --- NOUVELLE ROUTE : Recommandation par Film ---
+
+@app.get("/recommendations/movie/{movie_id}")
+def get_recommendations_by_movie(movie_id: int, db: Session = Depends(get_db)):
+    # 1. On récupère le film de référence
+    reference_movie = db.query(Movie).filter(Movie.tmdb_id == movie_id).first()
+    
+    if not reference_movie:
+        # Si le film n'est pas en base, on renvoie les mieux notés en secours
+        backup = db.query(Movie).order_by(Movie.rating.desc()).limit(RECOMMENDATION_LIMIT).all()
+        return {"recommendations": [format_movie(m, "Populaire") for m in backup]}
+
+    # 2. On prépare les genres du film de référence
+    ref_genres = set(split_genres(reference_movie.genre))
+
+    # 3. On récupère les candidats (tous les films sauf celui-ci)
+    candidates = db.query(Movie).filter(Movie.tmdb_id != movie_id).all()
+    scored_movies = []
+
+    for movie in candidates:
+        movie_genres = set(split_genres(movie.genre))
+        # On calcule l'intersection (les genres en commun)
+        common_genres = ref_genres.intersection(movie_genres)
+        
+        if common_genres:
+            # Score = nombre de genres en commun + bonus sur la note
+            score = len(common_genres) * 5 + (movie.rating or 0)
+            scored_movies.append({
+                "score": score,
+                "movie": movie,
+                "common": list(common_genres)
+            })
+
+    # 4. Tri par score décroissant
+    scored_movies.sort(key=lambda x: x["score"], reverse=True)
+
+    # 5. Formatage des résultats
+    results = []
+    for item in scored_movies[:RECOMMENDATION_LIMIT]:
+        info = f"Similaire à {reference_movie.title}"
+        results.append(format_movie(item["movie"], info))
+
+    return {"status": "success", "recommendations": results}
 
 if __name__ == "__main__":
     import uvicorn
