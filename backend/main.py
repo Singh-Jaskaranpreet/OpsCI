@@ -5,18 +5,14 @@ import os
 import requests
 from pathlib import Path
 import json
-from datetime import datetime, timedelta
-import urllib3
+from datetime import datetime
+load_dotenv()
 
-from database import engine, SessionLocal
-from models import Base, Movie, User, Favorite
+from database import SessionLocal, init_db
+from models import Movie, User, Favorite
 from sqlalchemy.orm import Session
 
-Base.metadata.create_all(bind=engine)
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-load_dotenv()
+init_db()
 
 app = FastAPI()
 
@@ -28,18 +24,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-TMDB_TOKEN = os.getenv("TMDB_TOKEN", "").strip()
-TMDB_BASE = "https://api.themoviedb.org/3"
-TMDB_IMG_BASE = "https://image.tmdb.org/t/p/w500"
-
 BASE_DIR = Path(__file__).parent
 EXPORT_DIR = BASE_DIR / "exports"
 EXPORT_DIR.mkdir(exist_ok=True)
-
-cache_movies = []
-cache_time = None
-CACHE_DURATION = timedelta(minutes=10)
-
+RECOMMENDATION_URL = os.getenv("RECOMMENDATION_URL", "http://localhost:8001")
 
 @app.get("/hello")
 def hello():
@@ -52,160 +40,93 @@ def get_db():
     finally:
         db.close()
 
-# TMDB
-def tmdb_get(path: str, params: dict | None = None) -> dict:
-    if not TMDB_TOKEN:
-        raise HTTPException(status_code=500, detail="TMDB_TOKEN manquant")
-
-    url = f"{TMDB_BASE}{path}"
-    headers = {
-        "Authorization": f"Bearer {TMDB_TOKEN}",
-        "accept": "application/json"
+def serialize_movie(movie: Movie) -> dict:
+    return {
+        "id": movie.id,
+        "title": movie.title,
+        "description": movie.description,
+        "image_url": movie.image_url,
+        "year": movie.year,
+        "tmdb_id": movie.tmdb_id,
+        "rating": movie.rating,
+        "genre": movie.genre,
+        "trailer_url": movie.trailer_url
     }
 
-    r = requests.get(url, headers=headers, params=params, timeout=10, verify=False)
 
-    if r.status_code != 200:
-        raise HTTPException(status_code=500, detail="Erreur TMDB")
-
-    return r.json()
-
-
-# NORMALIZE
-def normalize_tmdb_movie(m: dict) -> dict:
-    poster_path = m.get("poster_path")
-    image_url = f"{TMDB_IMG_BASE}{poster_path}" if poster_path else ""
+def get_recommendations_from_service(user_id: int) -> dict:
+    try:
+        response = requests.post(f"{RECOMMENDATION_URL}/update/{user_id}", timeout=5)
+        if response.status_code == 200:
+            return response.json()
+    except requests.RequestException as error:
+        print(f"Erreur service recommendation: {error}")
 
     return {
-        "title": m.get("title") or "Sans titre",
-        "description": m.get("overview") or "",
-        "image_url": image_url,
-        "year": (m.get("release_date") or "")[:4],
-        "tmdb_id": m.get("id"),
-        "rating": m.get("vote_average")
+        "status": "error",
+        "cached": False,
+        "recommendations": []
     }
 
 
 # MOVIES
 @app.get("/movies")
-def get_movies(limit: int = 10, offset: int = 0):
-    db = SessionLocal()
-
-    total = db.query(Movie).count()
-
-    # 🔥 remplir la DB si pas assez de films
-    if total < 100:
-        page = 1
-
-        while page <= 10:  # ≈ 200 films
-            data = tmdb_get("/movie/popular", params={
-                "language": "fr-FR",
-                "page": page
-            })
-
-            results = data.get("results", [])
-
-            for m in results:
-                movie = normalize_tmdb_movie(m)
-
-                # éviter doublons
-                exists = db.query(Movie).filter_by(tmdb_id=movie["tmdb_id"]).first()
-                if exists:
-                    continue
-
-                db_movie = Movie(
-                    tmdb_id=movie["tmdb_id"],
-                    title=movie["title"],
-                    description=movie["description"],
-                    image_url=movie["image_url"],
-                    year=movie["year"],
-                    rating=movie["rating"]
-                )
-
-                db.add(db_movie)
-
-            db.commit()
-            page += 1
-
-    # pagination
+def get_movies(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db)
+):
     movies = db.query(Movie).offset(offset).limit(limit).all()
-
-    return [
-        {
-            "title": m.title,
-            "description": m.description,
-            "image_url": m.image_url,
-            "year": m.year,
-            "tmdb_id": m.tmdb_id,
-            "rating": m.rating,
-            "genre": m.genre,
-            "trailer_url": m.trailer_url
-        }
-        for m in movies
-    ]
+    return [serialize_movie(movie) for movie in movies]
 
 
 # EXPORT
 @app.get("/export/movies.json")
-def export_movies(limit: int = Query(default=100, ge=1, le=200)):
-    movies = []
-    page = 1
-
-    while len(movies) < limit:
-        data = tmdb_get("/movie/popular", params={
-            "language": "fr-FR",
-            "page": page
-        })
-
-        results = data.get("results", [])
-
-        if not results:
-            break
-
-        movies.extend([normalize_tmdb_movie(m) for m in results])
-        page += 1
-
-        if page > 10:
-            break
-
-    movies = movies[:limit]
+def export_movies(
+    limit: int = Query(default=100, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    movies = db.query(Movie).limit(limit).all()
+    data = [serialize_movie(movie) for movie in movies]
 
     filename = f"movies_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     filepath = EXPORT_DIR / filename
 
-    filepath.write_text(json.dumps(movies, indent=2, ensure_ascii=False), encoding="utf-8")
+    filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
 
     return {
         "file": filename,
-        "count": len(movies)
+        "count": len(data)
     }
 
 
 # TRENDING
 @app.get("/movies/trending")
-def get_trending(limit: int = Query(default=20, ge=1, le=100)):
-    data = tmdb_get("/trending/movie/week", params={"language": "fr-FR"})
-    results = data.get("results", [])
+def get_trending(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    movies = db.query(Movie).order_by(Movie.rating.desc()).limit(limit).all()
+    return [serialize_movie(movie) for movie in movies]
 
-    movies = [normalize_tmdb_movie(m) for m in results]
 
-    return movies[:limit]
+@app.get("/movies/{movie_id}")
+def get_movie(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(Movie).filter(Movie.tmdb_id == movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Film non trouvé")
+
+    return serialize_movie(movie)
 
 
 # TRAILER
 @app.get("/movies/{movie_id}/trailer")
-def get_trailer(movie_id: int):
-    data = tmdb_get(f"/movie/{movie_id}/videos")
+def get_trailer(movie_id: int, db: Session = Depends(get_db)):
+    movie = db.query(Movie).filter(Movie.tmdb_id == movie_id).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Film non trouvé")
 
-    results = data.get("results", [])
-
-    for video in results:
-        if video["type"] == "Trailer" and video["site"] == "YouTube":
-            return {
-                "url": f"https://www.youtube.com/watch?v={video['key']}"
-            }
-
-    return {"url": None}
+    return {"url": movie.trailer_url}
 
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
@@ -256,21 +177,36 @@ def add_favorite(
         db.add(new_fav)
         db.commit()
 
-    # 3. Appel au service de recommandation (Port 8001)
-    recos = []
-    try:
-        # Note : Si tu es sous Docker, remplace localhost par recom-service
-        recom_url = f"http://localhost:8001/update/{user.id}"
-        response = requests.post(recom_url, timeout=5)
-        if response.status_code == 200:
-            recos = response.json().get("recommendations", [])
-    except Exception as e:
-        print(f"⚠️ Erreur service reco: {e}")
-
     return {
         "message": "Favori ajouté !", 
-        "recommendations": recos
+        "recommendations": get_recommendations_from_service(user.id).get("recommendations", [])
     }
+
+
+@app.post("/favorites/remove")
+def remove_favorite(
+    username: str = Form(...),
+    movie_id: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    favorite = db.query(Favorite).filter(
+        Favorite.user_id == user.id,
+        Favorite.movie_id == movie_id
+    ).first()
+
+    if favorite:
+        db.delete(favorite)
+        db.commit()
+
+    return {
+        "message": "Favori supprimé !",
+        "recommendations": get_recommendations_from_service(user.id).get("recommendations", [])
+    }
+
 
 @app.get("/favorites/check")
 def check_favorite(username: str, movie_id: int, db: Session = Depends(get_db)):
@@ -293,22 +229,10 @@ def get_favorites(username: str, db: Session = Depends(get_db)):
 
 @app.get("/recommendations/{username}")
 def get_reco(username: str, db: Session = Depends(get_db)):
-    # 1. Récupération de l'utilisateur
     user = db.query(User).filter(User.username == username).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
 
-    # 2. Demande de mise à jour et récupération des recos au service Recom
-    try:
-        # On appelle la route /update du service recom qui gère NumPy et les Genres
-        recom_url = f"http://localhost:8001/update/{user.id}"
-        response = requests.post(recom_url, timeout=5)
-        
-        if response.status_code == 200:
-            return response.json()
-        else:
-            return {"status": "error", "message": "Service reco indisponible", "recommendations": []}
-            
-    except Exception as e:
-        print(f"⚠️ Erreur contact service recom: {e}")
-        return {"status": "error", "message": str(e), "recommendations": []}
+    return {
+        **get_recommendations_from_service(user.id)
+    }

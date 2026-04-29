@@ -2,11 +2,12 @@ import requests
 import os
 from dotenv import load_dotenv
 
-from database import SessionLocal, engine
-from models import Movie,Base
-
 load_dotenv()
-Base.metadata.create_all(bind=engine)
+
+from database import SessionLocal, init_db
+from models import Movie
+
+init_db()
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN")
 GENRES_MAP = {
@@ -18,9 +19,14 @@ GENRES_MAP = {
 }
 
 def tmdb_get(endpoint, params=None):
+    if not TMDB_TOKEN:
+        raise RuntimeError("TMDB_TOKEN manquant dans le fichier .env")
+
     url = f"https://api.themoviedb.org/3{endpoint}"
     headers = {"Authorization": f"Bearer {TMDB_TOKEN}"}
-    return requests.get(url, headers=headers, params=params).json()
+    response = requests.get(url, headers=headers, params=params, timeout=10)
+    response.raise_for_status()
+    return response.json()
 
 
 def normalize_tmdb_movie(m):

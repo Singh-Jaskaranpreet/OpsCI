@@ -1,17 +1,21 @@
-import os
+import hashlib
+import json
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import or_ # Indispensable pour le multi-genre
 from dotenv import load_dotenv
-
-# Importations locales
-from database import SessionLocal
-from models import Favorite, Movie 
 
 load_dotenv()
 
+# Importations locales
+from database import SessionLocal, init_db
+from models import Favorite, Movie, RecommendationCache
+
+init_db()
+
 app = FastAPI(title="SinghFlix AI Recommendation - Multi-Genre Mode")
+RECOMMENDATION_ALGORITHM_VERSION = "all-favorites-v2"
+RECOMMENDATION_LIMIT = 14
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,63 +37,137 @@ def get_db():
 def format_movie(movie, info=""):
     return {
         "id": movie.id,
+        "tmdb_id": movie.tmdb_id,
         "title": movie.title,
+        "image_url": movie.image_url,
         "poster_path": movie.image_url,
+        "rating": movie.rating,
         "vote_average": movie.rating,
-        "genres": movie.genre, # Affiche la liste des genres (ex: "Action, Drame")
+        "genre": movie.genre,
+        "genres": movie.genre,
+        "description": movie.description,
+        "year": movie.year,
+        "trailer_url": movie.trailer_url,
         "info": info
     }
+
+
+def get_favorites_hash(favs):
+    favorite_ids = sorted(str(f.movie_id) for f in favs)
+    hash_input = f"{RECOMMENDATION_ALGORITHM_VERSION}:{','.join(favorite_ids)}"
+    return hashlib.sha256(hash_input.encode("utf-8")).hexdigest()
+
+
+def split_genres(genre_text):
+    if not genre_text:
+        return []
+
+    return [genre.strip() for genre in genre_text.split(",") if genre.strip()]
+
+
+def calculate_recommendations(favs, db: Session):
+    if not favs:
+        # Fallback si pas de favoris : on renvoie les mieux notés
+        top_movies = db.query(Movie).order_by(Movie.rating.desc()).limit(RECOMMENDATION_LIMIT).all()
+        return [format_movie(m, "Films les mieux notés")]
+
+    fav_ids = []
+    favorite_profiles = []
+
+    for f in favs:
+        fav_ids.append(f.movie_id)
+        movie_in_db = db.query(Movie).filter(Movie.tmdb_id == f.movie_id).first()
+        favorite_genres = set(split_genres(movie_in_db.genre if movie_in_db else ""))
+        if favorite_genres:
+            favorite_profiles.append({
+                "title": movie_in_db.title,
+                "genres": favorite_genres
+            })
+
+    if not favorite_profiles:
+        recommendations = db.query(Movie).filter(Movie.tmdb_id.notin_(fav_ids)).order_by(Movie.rating.desc()).limit(RECOMMENDATION_LIMIT).all()
+        return [format_movie(m, "Suggestions pour vous") for m in recommendations]
+
+    candidates = db.query(Movie).filter(Movie.tmdb_id.notin_(fav_ids)).all()
+    scored_movies = []
+
+    for movie in candidates:
+        movie_genres = set(split_genres(movie.genre))
+        matched_genres = set()
+        matched_favorites = 0
+        similarity_score = 0
+
+        for favorite in favorite_profiles:
+            overlap = movie_genres.intersection(favorite["genres"])
+            if overlap:
+                matched_favorites += 1
+                matched_genres.update(overlap)
+                similarity_score += len(overlap)
+
+        if not matched_genres:
+            continue
+
+        # Bonus when a movie is similar to several favorite movies, not only one.
+        similarity_score += matched_favorites * 2
+
+        scored_movies.append((
+            similarity_score,
+            matched_favorites,
+            movie.rating or 0,
+            movie,
+            sorted(matched_genres)
+        ))
+
+    if not scored_movies:
+        recommendations = db.query(Movie).filter(Movie.tmdb_id.notin_(fav_ids)).order_by(Movie.rating.desc()).limit(RECOMMENDATION_LIMIT).all()
+        return [format_movie(m, "Suggestions pour vous") for m in recommendations]
+
+    scored_movies.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+
+    results = []
+    for score, matched_favorites, rating, movie, matched_genres in scored_movies[:RECOMMENDATION_LIMIT]:
+        info_label = f"Similaire à vos favoris : {', '.join(matched_genres)}"
+        formatted = format_movie(movie, info_label)
+        formatted["similarity_score"] = score
+        formatted["matched_favorites"] = matched_favorites
+        results.append(formatted)
+
+    return results
+
 
 # --- ROUTE PRINCIPALE ---
 
 @app.post("/update/{user_id}")
 def update_recommendations(user_id: int, db: Session = Depends(get_db)):
-    # 1. Récupérer tous les favoris
     favs = db.query(Favorite).filter(Favorite.user_id == user_id).all()
-    
-    if not favs:
-        # Fallback si pas de favoris : on renvoie les mieux notés
-        top_movies = db.query(Movie).order_by(Movie.rating.desc()).limit(6).all()
-        return {"status": "success", "recommendations": [format_movie(m) for m in top_movies]}
+    favorites_hash = get_favorites_hash(favs)
 
-    # 2. ANALYSE DES GENRES PRÉFÉRÉS
-    all_genres = []
-    fav_ids = []
-    for f in favs:
-        fav_ids.append(f.movie_id)
-        # On cherche le film en BDD pour avoir ses genres
-        movie_in_db = db.query(Movie).filter(Movie.tmdb_id == f.movie_id).first()
-        if movie_in_db and movie_in_db.genre:
-            # On découpe "Action, Drame" en ["Action", "Drame"]
-            genres = [g.strip() for g in movie_in_db.genre.split(",")]
-            all_genres.extend(genres)
+    cached = db.query(RecommendationCache).filter(RecommendationCache.user_id == user_id).first()
+    if cached and cached.favorites_hash == favorites_hash:
+        return {
+            "status": "success",
+            "cached": True,
+            "recommendations": json.loads(cached.recommendations_json)
+        }
 
-    # On compte les occurrences de chaque genre
-    # Exemple : {"Action": 5, "Drame": 2}
-    if all_genres:
-        genre_counts = {}
-        for g in all_genres:
-            genre_counts[g] = genre_counts.get(g, 0) + 1
-        
-        # On trie pour avoir le genre le plus présent en premier
-        sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)
-        top_genre = sorted_genres[0][0] # Le nom du genre préféré
-        
-        # 3. RECHERCHE BASÉE SUR LE GENRE PRÉFÉRÉ
-        my_recos = db.query(Movie).filter(
-            Movie.tmdb_id.notin_(fav_ids), # Pas les films déjà aimés
-            Movie.genre.like(f"%{top_genre}%")
-        ).order_by(Movie.rating.desc()).limit(5).all()
-        
-        info_label = f"Basé sur votre genre préféré : {top_genre}"
+    recommendations = calculate_recommendations(favs, db)
+
+    if cached:
+        cached.favorites_hash = favorites_hash
+        cached.recommendations_json = json.dumps(recommendations)
     else:
-        # Fallback si aucun genre n'est trouvé
-        my_recos = db.query(Movie).filter(Movie.tmdb_id.notin_(fav_ids)).order_by(Movie.rating.desc()).limit(5).all()
-        info_label = "Suggestions pour vous"
+        db.add(RecommendationCache(
+            user_id=user_id,
+            favorites_hash=favorites_hash,
+            recommendations_json=json.dumps(recommendations)
+        ))
+
+    db.commit()
 
     return {
         "status": "success",
-        "recommendations": [format_movie(m, info_label) for m in my_recos]
+        "cached": False,
+        "recommendations": recommendations
     }
 
 if __name__ == "__main__":

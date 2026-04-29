@@ -1,8 +1,7 @@
 const API_URL = "http://127.0.0.1:8000";
-const RECO_BASE = "http://localhost:8001";
 
 let offset = 0;
-const LIMIT = 10;
+const LIMIT = 14;
 
 // LOAD MOVIES
 async function loadMovies() {
@@ -26,6 +25,7 @@ async function loadMovies() {
 // DISPLAY
 function displayMovies(movies) {
   const container = document.getElementById("movies");
+  if (!container) return;
 
   movies.forEach(movie => {
     const card = document.createElement("div");
@@ -34,7 +34,8 @@ function displayMovies(movies) {
     card.innerHTML = `
       <img src="${movie.image_url || ''}">
       <h3>${movie.title || 'No title'}</h3>
-      <p>${movie.year || ''}</p>
+      <p>Année de sortie : ${movie.year || 'N/A'}</p>
+      <p>IMDb : ${movie.rating || 'N/A'}</p>
     `;
 
     card.onclick = () => showMovie(movie);
@@ -44,10 +45,17 @@ function displayMovies(movies) {
 
 // SHOW MOVIE
 async function showMovie(movie) {
-  document.getElementById("movies").classList.add("hidden");
-  document.getElementById("loadMore").classList.add("hidden");
-  document.getElementById("movieView").classList.remove("hidden");
-  document.getElementById("reco-container").innerHTML = "";
+  const moviesGrid = document.getElementById("movies");
+  const loadMoreBtn = document.getElementById("loadMore");
+  const movieView = document.getElementById("movieView");
+  const recoContainer = document.getElementById("reco-container");
+  const userSections = document.getElementById("userSections");
+
+  if (moviesGrid) moviesGrid.classList.add("hidden");
+  if (loadMoreBtn) loadMoreBtn.classList.add("hidden");
+  if (userSections) userSections.classList.add("hidden");
+  if (movieView) movieView.classList.remove("hidden");
+  if (recoContainer) recoContainer.innerHTML = "";
 
   document.getElementById("title").innerText = movie.title || "No title";
   const genreElem = document.getElementById("genre");
@@ -55,30 +63,38 @@ async function showMovie(movie) {
       genreElem.innerText = "Genre : " + (movie.genre || "Non spécifié");
   }
   
-  document.getElementById("year").innerText = movie.year || "";
-  document.getElementById("rating").innerText = "⭐ " + (movie.rating || "N/A");
+  document.getElementById("year").innerText = "Année de sortie : " + (movie.year || "N/A");
+  document.getElementById("rating").innerText = "IMDb rating : " + (movie.rating || "N/A");
   document.getElementById("desc").innerText = movie.description || "";
   document.getElementById("movieImage").src = movie.image_url || "";
   
   const favContainer = document.getElementById("favContainer");
   const username = localStorage.getItem('userConnected');
 
+  if (favContainer) {
+    favContainer.innerHTML = "";
+  }
+
   if (username && favContainer) {
     // On demande au Backend si c'est déjà en favori
     const checkRes = await fetch(`${API_URL}/favorites/check?username=${username}&movie_id=${movie.tmdb_id}`);
     const checkData = await checkRes.json();
 
-    favContainer.innerHTML = "";
     const btn = document.createElement("button");
 
     if (checkData.is_favorite) {
       btn.innerText = "❤️ Dans tes favoris";
       btn.style.backgroundColor = "#e50914"; // Rouge Netflix
-      btn.onclick = () => alert("Tu as déjà ce film en favori !");
+      btn.onclick = () => retirerDesFavoris(movie.tmdb_id);
     } else {
       btn.innerText = "⭐ Ajouter aux favoris";
       btn.onclick = () => ajouterAuxFavoris(movie.tmdb_id, movie.title, movie.image_url);
     }
+    favContainer.appendChild(btn);
+  } else if (favContainer) {
+    const btn = document.createElement("button");
+    btn.innerText = "Se connecter pour ajouter aux favoris";
+    btn.onclick = () => window.location.href = "login.html";
     favContainer.appendChild(btn);
   }
 
@@ -102,13 +118,57 @@ async function showMovie(movie) {
 
 // BACK
 function goHome() {
-  document.getElementById("movieView").classList.add("hidden");
-  document.getElementById("movies").classList.remove("hidden");
-  document.getElementById("loadMore").classList.remove("hidden");
+  const movieView = document.getElementById("movieView");
+  const moviesGrid = document.getElementById("movies");
+  const loadMoreBtn = document.getElementById("loadMore");
+
+  if (movieView) movieView.classList.add("hidden");
+  if (moviesGrid) moviesGrid.classList.remove("hidden");
+  if (loadMoreBtn) loadMoreBtn.classList.remove("hidden");
+  refreshHomeUserSections();
 
   const iframe = document.getElementById("trailerIframe");
-  iframe.src = "";
-  iframe.classList.add("hidden");
+  if (iframe) {
+    iframe.src = "";
+    iframe.classList.add("hidden");
+  }
+}
+
+async function retirerDesFavoris(id) {
+  const user = localStorage.getItem('userConnected');
+  if (!user) return alert("Connecte-toi d'abord !");
+
+  const form = new FormData();
+  form.append('username', user);
+  form.append('movie_id', id);
+
+  try {
+    const res = await fetch(`${API_URL}/favorites/remove`, {
+      method: 'POST',
+      body: form
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      const favContainer = document.getElementById("favContainer");
+      const btn = favContainer ? favContainer.querySelector("button") : null;
+      if (btn) {
+        btn.innerText = "⭐ Ajouter aux favoris";
+        btn.style.backgroundColor = "orange";
+        const currentTitle = document.getElementById("title").innerText;
+        const currentImage = document.getElementById("movieImage").src;
+        btn.onclick = () => ajouterAuxFavoris(id, currentTitle, currentImage);
+      }
+
+      afficherLesSuggestions(data.recommendations || []);
+      await refreshHomeUserSections();
+    } else {
+      alert(data.message || "Erreur lors de la suppression");
+    }
+  } catch (err) {
+    console.error("Erreur:", err);
+  }
 }
 
 async function ajouterAuxFavoris(id, title, imageUrl) {
@@ -138,13 +198,13 @@ async function ajouterAuxFavoris(id, title, imageUrl) {
         btn.style.backgroundColor = "#e50914";
       }
 
-      await fetch(`http://127.0.0.1:8001/update/${user}`, { method: 'POST' });
       // 2. AFFICHAGE DES RECOMMANDATIONS
       if (data.recommendations && data.recommendations.length > 0) {
         afficherLesSuggestions(data.recommendations);
       } else {
         alert("Ajouté avec succès !");
       }
+      await refreshHomeUserSections();
     } else {
       alert(data.message || "Erreur lors de l'ajout");
     }
@@ -158,12 +218,15 @@ function updateNavbar() {
     const loginBtn = document.getElementById('loginBtn');
     const dashboardBtn = document.getElementById('dashboardBtn');
 
-    // On vérifie d'abord si les boutons existent sur la page
     if (user) {
-        if (loginBtn) loginBtn.classList.add('hidden'); // On ajoute "if (loginBtn)"
+        if (loginBtn) loginBtn.classList.add('hidden');
         if (dashboardBtn) {
             dashboardBtn.classList.remove('hidden');
-            dashboardBtn.innerText = user;
+            dashboardBtn.innerText = `Se déconnecter (${user})`;
+            dashboardBtn.onclick = () => {
+              localStorage.removeItem('userConnected');
+              window.location.href = "index.html";
+            };
         }
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
@@ -219,7 +282,7 @@ async function connecter(event) {
         // Attention : ton Python renvoie {"status": "ok"}, pas {"success": true}
         if (res.ok && (data.status === "ok" || data.username)) {
             localStorage.setItem("userConnected", u);
-            window.location.href = "dashboard.html";
+            window.location.href = "index.html";
         } else {
             alert("Identifiants incorrects");
         }
@@ -238,24 +301,32 @@ async function chargerDashboard() {
   
   const favsContainer = document.getElementById('favs');
   if (favsContainer) {
-    favsContainer.innerHTML = favs.map(f => `
-      <div class="card" onclick="chargerEtAfficher(${f.movie_id})">
-        <img src="${f.image_url}">
-        <h3>${f.title}</h3>
-      </div>
-    `).join('');
+    if (favs.length === 0) {
+      favsContainer.innerHTML = `<p class="empty-message">Aucun favori pour le moment.</p>`;
+    } else {
+      favsContainer.innerHTML = favs.map(f => `
+        <div class="card favorite-card">
+          <div onclick="chargerEtAfficher(${f.movie_id})">
+            <img src="${f.image_url}">
+            <h3>${f.title}</h3>
+          </div>
+          <button class="remove-fav-btn" onclick="retirerDesFavoris(${f.movie_id})">Retirer</button>
+        </div>
+      `).join('');
+    }
   }
 
-  // 2. Charger les Recommendations
-  // On utilise un bloc try/catch pour ne pas bloquer si le port 8001 est éteint
+  // 2. Charger les Recommendations depuis le backend principal
   try {
-    const resReco = await fetch(`http://127.0.0.1:8001/update/${user}`, { method: 'POST' });
+    const resReco = await fetch(`${API_URL}/recommendations/${user}`);
     const dataReco = await resReco.json();
-    if (dataReco.recommendations) {
+    if (dataReco.recommendations && dataReco.recommendations.length > 0) {
         afficherLesSuggestions(dataReco.recommendations);
+    } else {
+        afficherLesSuggestions([]);
     }
   } catch (e) {
-    console.log("Le service de recommandation n'est pas lancé.");
+    console.log("Recommendations indisponibles.");
   }
 }
 
@@ -267,13 +338,78 @@ async function chargerEtAfficher(movieId) {
     showMovie(movieData); // Ta fonction existante
 }
 
-function afficherLesSuggestions(movies) {
+async function refreshHomeUserSections() {
+  const userSections = document.getElementById("userSections");
+  const movieView = document.getElementById("movieView");
+  const user = localStorage.getItem("userConnected");
+
+  if (!userSections) return;
+
+  if (!user || (movieView && !movieView.classList.contains("hidden"))) {
+    userSections.classList.add("hidden");
+    return;
+  }
+
+  userSections.classList.remove("hidden");
+  await chargerFavoris("homeFavs");
+  await chargerRecommendations("homeRecoContainer");
+}
+
+async function chargerFavoris(containerId) {
+  const user = localStorage.getItem("userConnected");
+  const favsContainer = document.getElementById(containerId);
+  if (!user || !favsContainer) return;
+
+  const resFav = await fetch(`${API_URL}/favorites/${user}`);
+  const favs = await resFav.json();
+
+  if (favs.length === 0) {
+    favsContainer.innerHTML = `<p class="empty-message">Aucun favori pour le moment.</p>`;
+    return;
+  }
+
+  favsContainer.innerHTML = favs.map(f => `
+    <div class="card favorite-card">
+      <div onclick="chargerEtAfficher(${f.movie_id})">
+        <img src="${f.image_url}">
+        <h3>${f.title}</h3>
+      </div>
+      <button class="remove-fav-btn" onclick="retirerDesFavoris(${f.movie_id})">Retirer</button>
+    </div>
+  `).join('');
+}
+
+async function chargerRecommendations(containerId) {
+  const user = localStorage.getItem("userConnected");
+  if (!user) return;
+
+  try {
+    const resReco = await fetch(`${API_URL}/recommendations/${user}`);
+    const dataReco = await resReco.json();
+    afficherLesSuggestions(dataReco.recommendations || [], containerId);
+  } catch (e) {
+    console.log("Recommendations indisponibles.");
+    afficherLesSuggestions([], containerId);
+  }
+}
+
+function afficherLesSuggestions(movies, containerId = "reco-container") {
     // 1. On cible l'ID PRÉCIS du container de recommandations
-    let recoDiv = document.getElementById("reco-container");
+    let recoDiv = document.getElementById(containerId);
     
     // Si on ne le trouve pas (par exemple sur l'accueil), on ne fait rien 
     // ou on cherche un autre endroit spécifique.
     if (!recoDiv) return;
+
+    if (!movies.length) {
+      recoDiv.innerHTML = `
+        <div id="reco-section" style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
+          <h2 style="color: #e50914;">Suggestions pour vous</h2>
+          <p class="empty-message">Aucune recommandation disponible pour le moment.</p>
+        </div>
+      `;
+      return;
+    }
 
     // 2. On utilise "=" ici, mais ça ne videra QUE la zone "reco-container"
     // Le reste de ta page (films favoris, menu) restera intact.
@@ -286,11 +422,15 @@ function afficherLesSuggestions(movies) {
     movies.forEach(m => {
         const movieData = {
             id: m.id,
-            tmdb_id: m.id,
+            tmdb_id: m.tmdb_id || m.id,
             title: m.title,
             image_url: m.poster_path || m.image_url,
             rating: m.vote_average || m.rating,
-            description: m.overview || m.description || ""
+            description: m.overview || m.description || "",
+            year: m.year || "",
+            genre: m.genre || m.genres || "",
+            trailer_url: m.trailer_url || "",
+            info: m.info || ""
         };
         const movieString = JSON.stringify(movieData).replace(/"/g, '&quot;');
 
@@ -298,6 +438,9 @@ function afficherLesSuggestions(movies) {
             <div class="card" onclick="showMovie(${movieString})" style="min-width: 180px; cursor: pointer;">
                 <img src="${movieData.image_url}" style="width: 100%; border-radius: 8px;">
                 <h3 style="font-size: 0.9rem;">${movieData.title}</h3>
+                <p>Année de sortie : ${movieData.year || 'N/A'}</p>
+                <p>IMDb : ${movieData.rating || 'N/A'}</p>
+                ${movieData.info ? `<p class="reco-info">${movieData.info}</p>` : ''}
             </div>
         `;
     });
@@ -325,10 +468,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Page ACCUEIL
   if (document.getElementById("movies")) {
     loadMovies();
+    refreshHomeUserSections();
     document.getElementById("loadMore").onclick = loadMovies;
     document.getElementById("search").oninput = (e) => {
         const q = e.target.value.toLowerCase();
-        document.querySelectorAll(".card").forEach(card => {
+        document.querySelectorAll("#movies .card").forEach(card => {
             card.style.display = card.querySelector("h3").innerText.toLowerCase().includes(q) ? "block" : "none";
         });
     };
@@ -337,7 +481,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // BOUTONS COMMUNS
   if (document.getElementById("backBtn")) document.getElementById("backBtn").onclick = goHome;
   if (document.getElementById("loginBtn")) document.getElementById("loginBtn").onclick = () => window.location.href="login.html";
-  if (document.getElementById("dashboardBtn")) document.getElementById("dashboardBtn").onclick = () => window.location.href="dashboard.html";
-
   updateNavbar();
 });

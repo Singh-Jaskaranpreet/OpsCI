@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -40,3 +40,12 @@ class Favorite(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
 
     owner = relationship("User", back_populates="favorites")
+
+
+class RecommendationCache(Base):
+    __tablename__ = "recommendation_cache"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
+    favorites_hash = Column(String)
+    recommendations_json = Column(Text)
