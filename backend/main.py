@@ -74,10 +74,37 @@ def get_recommendations_from_service(user_id: int) -> dict:
 def get_movies(
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    q: str = "",
+    genre: str = "",
     db: Session = Depends(get_db)
 ):
-    movies = db.query(Movie).offset(offset).limit(limit).all()
+    query = db.query(Movie)
+
+    if q:
+        query = query.filter(Movie.title.ilike(f"%{q}%"))
+
+    if genre:
+        query = query.filter(Movie.genre.ilike(f"%{genre}%"))
+
+    movies = query.offset(offset).limit(limit).all()
     return [serialize_movie(movie) for movie in movies]
+
+
+@app.get("/movies/filters")
+def get_movie_filters(db: Session = Depends(get_db)):
+    movies = db.query(Movie.genre).all()
+    genres = set()
+
+    for (genre_text,) in movies:
+        if genre_text:
+            for genre in genre_text.split(","):
+                cleaned = genre.strip()
+                if cleaned:
+                    genres.add(cleaned)
+
+    return {
+        "genres": sorted(genres)
+    }
 
 
 # EXPORT
@@ -222,9 +249,24 @@ def get_favorites(username: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == username).first()
     if not user:
         return []
-    
-    # On renvoie la liste des films favoris de l'utilisateur
-    return user.favorites
+
+    favorites = []
+    for favorite in user.favorites:
+        movie = db.query(Movie).filter(Movie.tmdb_id == favorite.movie_id).first()
+        if movie:
+            data = serialize_movie(movie)
+            data["movie_id"] = movie.tmdb_id
+            favorites.append(data)
+        else:
+            favorites.append({
+                "movie_id": favorite.movie_id,
+                "title": favorite.title,
+                "image_url": favorite.image_url,
+                "year": None,
+                "rating": None
+            })
+
+    return favorites
 
 
 @app.get("/recommendations/{username}")

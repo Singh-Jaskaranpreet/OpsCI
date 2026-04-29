@@ -2,11 +2,26 @@ const API_URL = "http://127.0.0.1:8000";
 
 let offset = 0;
 const LIMIT = 14;
+let currentView = "catalog";
+
+function getMovieQueryParams() {
+  const search = document.getElementById("search");
+  const genreFilter = document.getElementById("genreFilter");
+  const params = new URLSearchParams({
+    limit: LIMIT,
+    offset
+  });
+
+  if (search && search.value.trim()) params.append("q", search.value.trim());
+  if (genreFilter && genreFilter.value) params.append("genre", genreFilter.value);
+
+  return params.toString();
+}
 
 // LOAD MOVIES
 async function loadMovies() {
   try {
-    const res = await fetch(`${API_URL}/movies?limit=${LIMIT}&offset=${offset}`);
+    const res = await fetch(`${API_URL}/movies?${getMovieQueryParams()}`);
     const movies = await res.json();
 
     if (!movies.length) {
@@ -22,6 +37,21 @@ async function loadMovies() {
   }
 }
 
+function renderMovieCard(movie, options = {}) {
+  const info = options.info || movie.info || "";
+  return `
+    <img src="${movie.image_url || movie.poster_path || ''}">
+    <div class="card-body">
+      <h3>${movie.title || 'No title'}</h3>
+      <div class="card-meta">
+        <p>Année de sortie : ${movie.year || 'N/A'}</p>
+        <p>IMDb : ${movie.rating || movie.vote_average || 'N/A'}</p>
+        ${info ? `<p class="reco-info">${info}</p>` : ''}
+      </div>
+    </div>
+  `;
+}
+
 // DISPLAY
 function displayMovies(movies) {
   const container = document.getElementById("movies");
@@ -30,13 +60,7 @@ function displayMovies(movies) {
   movies.forEach(movie => {
     const card = document.createElement("div");
     card.className = "card";
-
-    card.innerHTML = `
-      <img src="${movie.image_url || ''}">
-      <h3>${movie.title || 'No title'}</h3>
-      <p>Année de sortie : ${movie.year || 'N/A'}</p>
-      <p>IMDb : ${movie.rating || 'N/A'}</p>
-    `;
+    card.innerHTML = renderMovieCard(movie);
 
     card.onclick = () => showMovie(movie);
     container.appendChild(card);
@@ -45,15 +69,12 @@ function displayMovies(movies) {
 
 // SHOW MOVIE
 async function showMovie(movie) {
-  const moviesGrid = document.getElementById("movies");
-  const loadMoreBtn = document.getElementById("loadMore");
   const movieView = document.getElementById("movieView");
   const recoContainer = document.getElementById("reco-container");
-  const userSections = document.getElementById("userSections");
+  const searchFilters = document.getElementById("searchFilters");
 
-  if (moviesGrid) moviesGrid.classList.add("hidden");
-  if (loadMoreBtn) loadMoreBtn.classList.add("hidden");
-  if (userSections) userSections.classList.add("hidden");
+  document.querySelectorAll(".app-view").forEach(view => view.classList.add("hidden"));
+  if (searchFilters) searchFilters.classList.add("hidden");
   if (movieView) movieView.classList.remove("hidden");
   if (recoContainer) recoContainer.innerHTML = "";
 
@@ -119,13 +140,11 @@ async function showMovie(movie) {
 // BACK
 function goHome() {
   const movieView = document.getElementById("movieView");
-  const moviesGrid = document.getElementById("movies");
-  const loadMoreBtn = document.getElementById("loadMore");
+  const searchFilters = document.getElementById("searchFilters");
 
   if (movieView) movieView.classList.add("hidden");
-  if (moviesGrid) moviesGrid.classList.remove("hidden");
-  if (loadMoreBtn) loadMoreBtn.classList.remove("hidden");
-  refreshHomeUserSections();
+  if (searchFilters) searchFilters.classList.remove("hidden");
+  showView(currentView);
 
   const iframe = document.getElementById("trailerIframe");
   if (iframe) {
@@ -339,20 +358,15 @@ async function chargerEtAfficher(movieId) {
 }
 
 async function refreshHomeUserSections() {
-  const userSections = document.getElementById("userSections");
   const movieView = document.getElementById("movieView");
   const user = localStorage.getItem("userConnected");
 
-  if (!userSections) return;
-
   if (!user || (movieView && !movieView.classList.contains("hidden"))) {
-    userSections.classList.add("hidden");
     return;
   }
 
-  userSections.classList.remove("hidden");
-  await chargerFavoris("homeFavs");
-  await chargerRecommendations("homeRecoContainer");
+  if (currentView === "favorites") await chargerFavoris("homeFavs");
+  if (currentView === "recommendations") await chargerRecommendations("homeRecoContainer");
 }
 
 async function chargerFavoris(containerId) {
@@ -371,8 +385,12 @@ async function chargerFavoris(containerId) {
   favsContainer.innerHTML = favs.map(f => `
     <div class="card favorite-card">
       <div onclick="chargerEtAfficher(${f.movie_id})">
-        <img src="${f.image_url}">
-        <h3>${f.title}</h3>
+        ${renderMovieCard({
+          title: f.title,
+          image_url: f.image_url,
+          year: f.year,
+          rating: f.rating
+        })}
       </div>
       <button class="remove-fav-btn" onclick="retirerDesFavoris(${f.movie_id})">Retirer</button>
     </div>
@@ -436,11 +454,7 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
 
         html += `
             <div class="card" onclick="showMovie(${movieString})" style="min-width: 180px; cursor: pointer;">
-                <img src="${movieData.image_url}" style="width: 100%; border-radius: 8px;">
-                <h3 style="font-size: 0.9rem;">${movieData.title}</h3>
-                <p>Année de sortie : ${movieData.year || 'N/A'}</p>
-                <p>IMDb : ${movieData.rating || 'N/A'}</p>
-                ${movieData.info ? `<p class="reco-info">${movieData.info}</p>` : ''}
+                ${renderMovieCard(movieData)}
             </div>
         `;
     });
@@ -449,6 +463,102 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
     
     // 3. Mise à jour de la zone dédiée uniquement
     recoDiv.innerHTML = html; 
+}
+
+async function loadFilters() {
+  const genreFilter = document.getElementById("genreFilter");
+  if (!genreFilter) return;
+
+  genreFilter.innerHTML = `<option value="">Tous les genres</option>`;
+
+  try {
+    const res = await fetch(`${API_URL}/movies/filters`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const data = await res.json();
+    const genres = Array.isArray(data.genres) ? data.genres : [];
+
+    if (!genres.length) {
+      await loadFiltersFromMovies();
+      return;
+    }
+
+    genres.forEach(genre => {
+      const option = document.createElement("option");
+      option.value = genre;
+      option.textContent = genre;
+      genreFilter.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Erreur filtres:", error);
+    await loadFiltersFromMovies();
+  }
+}
+
+async function loadFiltersFromMovies() {
+  const genreFilter = document.getElementById("genreFilter");
+  if (!genreFilter) return;
+
+  try {
+    const res = await fetch(`${API_URL}/movies?limit=100&offset=0`);
+    const movies = await res.json();
+    const genres = new Set();
+
+    movies.forEach(movie => {
+      (movie.genre || "").split(",").forEach(genre => {
+        const cleaned = genre.trim();
+        if (cleaned) genres.add(cleaned);
+      });
+    });
+
+    [...genres].sort().forEach(genre => {
+      const option = document.createElement("option");
+      option.value = genre;
+      option.textContent = genre;
+      genreFilter.appendChild(option);
+    });
+  } catch (error) {
+    console.error("Fallback filtres impossible:", error);
+  }
+}
+
+async function resetAndLoadMovies() {
+  offset = 0;
+  const container = document.getElementById("movies");
+  if (container) container.innerHTML = "";
+  await loadMovies();
+}
+
+async function showView(viewName) {
+  const user = localStorage.getItem("userConnected");
+  currentView = viewName;
+
+  if (!user && viewName !== "catalog") {
+    window.location.href = "login.html";
+    return;
+  }
+
+  document.querySelectorAll(".app-view").forEach(view => view.classList.add("hidden"));
+  document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.view === viewName);
+  });
+
+  const searchFilters = document.getElementById("searchFilters");
+  if (searchFilters) searchFilters.classList.toggle("hidden", viewName !== "catalog");
+
+  if (viewName === "catalog") {
+    document.getElementById("catalogView").classList.remove("hidden");
+  }
+
+  if (viewName === "favorites") {
+    document.getElementById("favoritesView").classList.remove("hidden");
+    await chargerFavoris("homeFavs");
+  }
+
+  if (viewName === "recommendations") {
+    document.getElementById("recommendationsView").classList.remove("hidden");
+    await chargerRecommendations("homeRecoContainer");
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -467,15 +577,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Page ACCUEIL
   if (document.getElementById("movies")) {
+    loadFilters();
     loadMovies();
-    refreshHomeUserSections();
     document.getElementById("loadMore").onclick = loadMovies;
-    document.getElementById("search").oninput = (e) => {
-        const q = e.target.value.toLowerCase();
-        document.querySelectorAll("#movies .card").forEach(card => {
-            card.style.display = card.querySelector("h3").innerText.toLowerCase().includes(q) ? "block" : "none";
-        });
-    };
+    document.getElementById("search").oninput = resetAndLoadMovies;
+    document.getElementById("genreFilter").onchange = resetAndLoadMovies;
+    document.querySelectorAll(".tab-btn").forEach(btn => {
+      btn.onclick = () => showView(btn.dataset.view);
+    });
   }
 
   // BOUTONS COMMUNS

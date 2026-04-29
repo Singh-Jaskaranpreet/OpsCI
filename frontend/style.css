@@ -26,16 +26,24 @@ body {
 .search-container {
   display: flex;
   justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin: 20px;
 }
 
-.search-container input {
+.search-container input,
+.search-container select {
   width: 300px;
   padding: 10px;
   border-radius: 5px;
   border: none;
   background: #1c1c1c;
   color: white;
+}
+
+.search-container select {
+  width: 180px;
 }
 
 /* GRID */
@@ -49,13 +57,15 @@ body {
   gap: 20px;
 }
 
-#userSections {
+#favoritesView,
+#recommendationsView {
   margin-top: 40px;
   padding-top: 20px;
   border-top: 1px solid #333;
 }
 
-#userSections h2 {
+#favoritesView h2,
+#recommendationsView h2 {
   color: orange;
   margin-top: 0;
 }
@@ -91,6 +101,9 @@ body {
 
 .card {
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  min-height: 390px;
   transition: transform 0.3s, box-shadow 0.3s;
 }
 
@@ -103,6 +116,29 @@ body {
   width: 100%;
   height: 240px;
   object-fit: cover;
+}
+
+.card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding-top: 12px;
+}
+
+.card h3 {
+  min-height: 56px;
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.card-meta {
+  margin-top: auto;
+  min-height: 74px;
+}
+
+.card p {
+  margin: 8px 0 0;
 }
 
 /* BUTTONS */
@@ -235,6 +271,34 @@ button {
 
 button:hover {
   background: #e87e00;
+}
+
+.main-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  padding: 14px 20px 0;
+  background: #0f0f0f;
+}
+
+.main-tabs .tab-btn {
+  width: auto;
+  min-width: 0;
+  padding: 0 0 6px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: #ddd;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.main-tabs .tab-btn.active,
+.main-tabs .tab-btn:hover {
+  background: transparent;
+  color: orange;
+  border-bottom: 2px solid orange;
 }
 
 p {

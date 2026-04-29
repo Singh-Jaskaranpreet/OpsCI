@@ -15,23 +15,34 @@
     </div>
   </header>
 
-  <div class="search-container">
+  <nav id="mainTabs" class="main-tabs">
+    <button class="tab-btn active" data-view="catalog">Films</button>
+    <button class="tab-btn" data-view="favorites">Mes favoris</button>
+    <button class="tab-btn" data-view="recommendations">Top suggestions</button>
+  </nav>
+
+  <div id="searchFilters" class="search-container">
     <input type="text" id="search" placeholder="Rechercher un film...">
+    <select id="genreFilter">
+      <option value="">Tous les genres</option>
+    </select>
   </div>
 
   <main class="container">
+    <section id="catalogView" class="app-view">
+      <div id="movies" class="movies-grid"></div>
+      
+      <div style="text-align:center; margin: 20px 0;">
+        <button id="loadMore">Charger plus de films</button>
+      </div>
+    </section>
 
-    
-    <div id="movies" class="movies-grid"></div>
-    
-    <div style="text-align:center; margin: 20px 0;">
-      <button id="loadMore">Charger plus de films</button>
-    </div>
-
-    <section id="userSections" class="hidden">
+    <section id="favoritesView" class="app-view hidden">
       <h2>Mes Favoris</h2>
       <div id="homeFavs" class="movies-grid compact-grid"></div>
+    </section>
 
+    <section id="recommendationsView" class="app-view hidden">
       <div id="homeRecoContainer"></div>
     </section>
 
