@@ -7,7 +7,7 @@
 </head>
 <body>
   <header class="navbar">
-    <h1 onclick="goHome()">SINGHFLIX</h1>
+    <h1 onclick="goHome()" style="cursor:pointer">SINGHFLIX</h1>
 
     <div class="action-buttons">
       <button id="loginBtn">Se connecter</button>
@@ -20,19 +20,33 @@
   </div>
 
   <main class="container">
+
+    
     <div id="movies" class="movies-grid"></div>
-    <button id="loadMore">Charger plus</button>
+    
+    <div style="text-align:center; margin: 20px 0;">
+      <button id="loadMore">Charger plus de films</button>
+    </div>
 
     <div id="movieView" class="hidden">
-      <button id="backBtn">⬅ Retour</button>
-      <img id="movieImage" class="movie-poster">
-      <h2 id="title"></h2>
-      <p id="year"></p>
-      <p id="rating"></p>
-      <p id="desc"></p>
-      <div id="trailerContainer"></div>
-        <iframe id="trailerIframe" class="hidden" width="560" height="315" frameborder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      <button id="backBtn" onclick="goHome()">⬅ Retour à l'accueil</button>
+      
+      <div class="movie-detail-wrapper" style="display: flex; gap: 30px; margin-top: 20px;">
+        <img id="movieImage" class="movie-poster" style="width: 250px; border-radius: 10px;">
+        <div class="movie-info">
+          <h2 id="title"></h2>
+          <p id="genre" style="color: orange; font-weight: bold;"></p>
+          <p id="year"></p>
+          <p id="rating"></p>
+          <p id="desc"></p>
+          <div id="favContainer"></div>
+        </div>
       </div>
+
+      <div id="trailerContainer" style="margin-top:20px;">
+        <iframe id="trailerIframe" class="hidden" width="100%" height="450" frameborder="0" allowfullscreen></iframe>
+      </div>
+      <div id="reco-container"></div>
     </div>
   </main>
 

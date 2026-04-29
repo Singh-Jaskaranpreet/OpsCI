@@ -9,7 +9,13 @@ load_dotenv()
 Base.metadata.create_all(bind=engine)
 
 TMDB_TOKEN = os.getenv("TMDB_TOKEN")
-
+GENRES_MAP = {
+    28: "Action", 12: "Aventure", 16: "Animation", 35: "Comédie", 
+    80: "Crime", 99: "Documentaire", 18: "Drame", 10751: "Familial", 
+    14: "Fantastique", 36: "Histoire", 27: "Horreur", 10402: "Musique", 
+    9648: "Mystère", 10749: "Romance", 878: "Science-Fiction", 
+    53: "Thriller", 10752: "Guerre", 37: "Western"
+}
 
 def tmdb_get(endpoint, params=None):
     url = f"https://api.themoviedb.org/3{endpoint}"
@@ -18,13 +24,21 @@ def tmdb_get(endpoint, params=None):
 
 
 def normalize_tmdb_movie(m):
+    # On récupère tous les noms de genres correspondants aux IDs
+    genre_ids = m.get("genre_ids", [])
+    genres_list = [GENRES_MAP.get(gid) for gid in genre_ids if GENRES_MAP.get(gid)]
+    
+    # On les joint en une chaîne : "Action, Aventure, Science-Fiction"
+    genres_string = ", ".join(genres_list)
+
     return {
         "tmdb_id": m.get("id"),
         "title": m.get("title"),
         "description": m.get("overview"),
         "image_url": f"https://image.tmdb.org/t/p/w500{m.get('poster_path')}" if m.get("poster_path") else "",
         "year": m.get("release_date", "")[:4],
-        "rating": m.get("vote_average")
+        "rating": m.get("vote_average"),
+        "genre": genres_string
     }
 
 
@@ -63,6 +77,7 @@ def update_movies():
                 exists.image_url = movie["image_url"]
                 exists.year = movie["year"]
                 exists.rating = movie["rating"]
+                exists.genre = movie["genre"]
                 exists.trailer_url = trailer
             else:
                 db.add(Movie(
@@ -72,6 +87,7 @@ def update_movies():
                     image_url=movie["image_url"],
                     year=movie["year"],
                     rating=movie["rating"],
+                    genre = movie["genre"],
                     trailer_url=trailer
                 ))
 

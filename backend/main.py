@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 import urllib3
 
 from database import engine, SessionLocal
-from models import Base, Movie
+from models import Base, Movie, User, Favorite
+from sqlalchemy.orm import Session
 
 Base.metadata.create_all(bind=engine)
 
@@ -44,6 +45,12 @@ CACHE_DURATION = timedelta(minutes=10)
 def hello():
     return {"message": "Hello World"}
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # TMDB
 def tmdb_get(path: str, params: dict | None = None) -> dict:
@@ -130,7 +137,9 @@ def get_movies(limit: int = 10, offset: int = 0):
             "image_url": m.image_url,
             "year": m.year,
             "tmdb_id": m.tmdb_id,
-            "rating": m.rating
+            "rating": m.rating,
+            "genre": m.genre,
+            "trailer_url": m.trailer_url
         }
         for m in movies
     ]
@@ -197,3 +206,109 @@ def get_trailer(movie_id: int):
             }
 
     return {"url": None}
+
+@app.post("/login")
+def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username, User.password == password).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    # On renvoie l'ID en plus du pseudo !
+    return {"status": "ok", "username": username, "user_id": user.id}
+
+@app.post("/register")
+def register(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
+    if db.query(User).filter(User.username == username).first():
+        raise HTTPException(status_code=400, detail="L'utilisateur existe déjà")
+    
+    new_user = User(username=username, password=password)
+    db.add(new_user)
+    db.commit()
+    return {"status": "ok"}
+
+# --- GESTION DES FAVORIS ---
+
+@app.post("/favorites/add")
+def add_favorite(
+    username: str = Form(...), 
+    movie_id: int = Form(...), 
+    title: str = Form(...), 
+    image_url: str = Form(...), 
+    db: Session = Depends(get_db)
+):
+    # 1. Vérification de l'utilisateur
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    # 2. Ajout aux favoris s'il n'existe pas déjà
+    existing = db.query(Favorite).filter(
+        Favorite.user_id == user.id, 
+        Favorite.movie_id == movie_id
+    ).first()
+
+    if not existing:
+        new_fav = Favorite(
+            movie_id=movie_id, 
+            title=title, 
+            image_url=image_url, 
+            user_id=user.id
+        )
+        db.add(new_fav)
+        db.commit()
+
+    # 3. Appel au service de recommandation (Port 8001)
+    recos = []
+    try:
+        # Note : Si tu es sous Docker, remplace localhost par recom-service
+        recom_url = f"http://localhost:8001/update/{user.id}"
+        response = requests.post(recom_url, timeout=5)
+        if response.status_code == 200:
+            recos = response.json().get("recommendations", [])
+    except Exception as e:
+        print(f"⚠️ Erreur service reco: {e}")
+
+    return {
+        "message": "Favori ajouté !", 
+        "recommendations": recos
+    }
+
+@app.get("/favorites/check")
+def check_favorite(username: str, movie_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return {"is_favorite": False}
+    
+    exists = db.query(Favorite).filter_by(user_id=user.id, movie_id=movie_id).first()
+    return {"is_favorite": exists is not None}
+
+@app.get("/favorites/{username}")
+def get_favorites(username: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        return []
+    
+    # On renvoie la liste des films favoris de l'utilisateur
+    return user.favorites
+
+
+@app.get("/recommendations/{username}")
+def get_reco(username: str, db: Session = Depends(get_db)):
+    # 1. Récupération de l'utilisateur
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    # 2. Demande de mise à jour et récupération des recos au service Recom
+    try:
+        # On appelle la route /update du service recom qui gère NumPy et les Genres
+        recom_url = f"http://localhost:8001/update/{user.id}"
+        response = requests.post(recom_url, timeout=5)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"status": "error", "message": "Service reco indisponible", "recommendations": []}
+            
+    except Exception as e:
+        print(f"⚠️ Erreur contact service recom: {e}")
+        return {"status": "error", "message": str(e), "recommendations": []}
