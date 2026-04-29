@@ -1,9 +1,15 @@
+/* --- CONFIGURATION GLOBALE --- */
+// URL du point d'entrée unique (API Gateway / Proxy Backend)
 const API_URL = "http://127.0.0.1:8000";
 
-let offset = 0;
-const LIMIT = 14;
-let currentView = "catalog";
+let offset = 0; // Index de départ pour la pagination des films
+const LIMIT = 14; // Nombre de films à charger par requête
+let currentView = "catalog"; // État global pour la navigation Single Page (SPA)
 
+/**
+ * COUCHE LOGIQUE : GESTION DES REQUÊTES
+ * Prépare les paramètres de filtrage pour l'API
+ */
 function getMovieQueryParams() {
   const search = document.getElementById("search");
   const genreFilter = document.getElementById("genreFilter");
@@ -18,7 +24,10 @@ function getMovieQueryParams() {
   return params.toString();
 }
 
-// LOAD MOVIES
+/**
+ * COUCHE LOGIQUE : COMMUNICATION BACKEND
+ * Charge les films depuis le service principal (Port 8000)
+ */
 async function loadMovies() {
   try {
     const res = await fetch(`${API_URL}/movies?${getMovieQueryParams()}`);
@@ -29,14 +38,18 @@ async function loadMovies() {
       return;
     }
 
-    displayMovies(movies);
-    offset += LIMIT;
+    displayMovies(movies); // Appel de la couche présentation
+    offset += LIMIT; // Incrémentation pour le prochain chargement
 
   } catch (error) {
     console.error("Erreur:", error);
   }
 }
 
+/**
+ * COUCHE PRÉSENTATION : TEMPLATING
+ * Génère le HTML pour une carte de film (utilisé partout dans l'app)
+ */
 function renderMovieCard(movie, options = {}) {
   const info = options.info || movie.info || "";
   return `
@@ -52,7 +65,10 @@ function renderMovieCard(movie, options = {}) {
   `;
 }
 
-// DISPLAY
+/**
+ * COUCHE PRÉSENTATION : RÉSEAU DE GRILLE
+ * Affiche les films dans le catalogue principal
+ */
 function displayMovies(movies) {
   const container = document.getElementById("movies");
   if (!container) return;
@@ -62,22 +78,27 @@ function displayMovies(movies) {
     card.className = "card";
     card.innerHTML = renderMovieCard(movie);
 
-    card.onclick = () => showMovie(movie);
+    card.onclick = () => showMovie(movie); // Navigation vers le détail
     container.appendChild(card);
   });
 }
 
-// SHOW MOVIE
+/**
+ * FONCTION PRINCIPALE : VUE DÉTAILLÉE
+ * Orchestre les appels multi-services (Data, Trailer, Recommandations)
+ */
 async function showMovie(movie) {
   const movieView = document.getElementById("movieView");
   const recoContainer = document.getElementById("reco-container");
   const searchFilters = document.getElementById("searchFilters");
 
+  // Logique SPA : Masquage des vues et nettoyage
   document.querySelectorAll(".app-view").forEach(view => view.classList.add("hidden"));
   if (searchFilters) searchFilters.classList.add("hidden");
   if (movieView) movieView.classList.remove("hidden");
   if (recoContainer) recoContainer.innerHTML = "";
 
+  // Mise à jour de la couche présentation avec les données reçues
   document.getElementById("title").innerText = movie.title || "No title";
   const genreElem = document.getElementById("genre");
   if (genreElem) {
@@ -96,8 +117,8 @@ async function showMovie(movie) {
     favContainer.innerHTML = "";
   }
 
+  // Vérification synchrone de l'état des favoris (Backend 8000)
   if (username && favContainer) {
-    // On demande au Backend si c'est déjà en favori
     const checkRes = await fetch(`${API_URL}/favorites/check?username=${username}&movie_id=${movie.tmdb_id}`);
     const checkData = await checkRes.json();
 
@@ -105,7 +126,7 @@ async function showMovie(movie) {
 
     if (checkData.is_favorite) {
       btn.innerText = "❤️ Dans tes favoris";
-      btn.style.backgroundColor = "#e50914"; // Rouge Netflix
+      btn.style.backgroundColor = "#e50914"; 
     } else {
       btn.innerText = "⭐ Ajouter aux favoris";
       btn.onclick = () => ajouterAuxFavoris(movie.tmdb_id, movie.title, movie.image_url);
@@ -118,6 +139,7 @@ async function showMovie(movie) {
     favContainer.appendChild(btn);
   }
 
+  // Récupération du Trailer via l'API Data
   const iframe = document.getElementById("trailerIframe");
   iframe.classList.add("hidden");
   iframe.src = "";
@@ -135,8 +157,11 @@ async function showMovie(movie) {
     console.error("Erreur trailer:", error);
   }
 
+  /**
+   * COMMUNICATION INTER-SERVICES
+   * On appelle le Proxy Backend (8000) qui contacte le service Reco (8001)
+   */
   try {
-      // ON APPELLE LE PORT 8000 (API_URL) au lieu de 8001
       const res = await fetch(`${API_URL}/movies/${movie.tmdb_id}/recommendations`);
       const data = await res.json();
 
@@ -146,43 +171,37 @@ async function showMovie(movie) {
   } catch (e) {
       console.error("Erreur via le proxy backend:", e);
   }
-
 }
 
-// BACK
+/**
+ * GESTION DE LA NAVIGATION
+ * Réinitialise l'interface vers l'état catalogue
+ */
 function goHome() {
-  // 1. On cache la vue détail du film
   document.getElementById("movieView").classList.add("hidden");
 
-  // 2. On arrête et cache le trailer YouTube
   const iframe = document.getElementById("trailerIframe");
   if (iframe) {
     iframe.src = "";
     iframe.classList.add("hidden");
   }
 
-  // 3. REVENIR À LA VUE CATALOGUE (Onglets)
-  // On cache toutes les vues
   document.querySelectorAll('.app-view').forEach(view => view.classList.add('hidden'));
   
-  // On réaffiche uniquement le catalogue (la grille de films principale)
   const catalog = document.getElementById("catalogView");
-  if (catalog) {
-      catalog.classList.remove("hidden");
-  }
+  if (catalog) catalog.classList.remove("hidden");
 
-  // 4. On réactive le bouton "Films" dans la barre d'onglets
   document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
   const catalogBtn = document.querySelector('[data-view="catalog"]');
-  if (catalogBtn) {
-      catalogBtn.classList.add('active');
-  }
+  if (catalogBtn) catalogBtn.classList.add('active');
 
-  // 5. On réaffiche les filtres et le bouton "Charger plus"
   document.getElementById("searchFilters").classList.remove("hidden");
   document.getElementById("loadMore").classList.remove("hidden");
 }
 
+/**
+ * COUCHE LOGIQUE : ACTIONS UTILISATEUR (FAVORIS)
+ */
 async function retirerDesFavoris(id) {
   const user = localStorage.getItem('userConnected');
   if (!user) return alert("Connecte-toi d'abord !");
@@ -197,8 +216,6 @@ async function retirerDesFavoris(id) {
       body: form
     });
 
-    const data = await res.json();
-
     if (res.ok) {
       const favContainer = document.getElementById("favContainer");
       const btn = favContainer ? favContainer.querySelector("button") : null;
@@ -209,10 +226,7 @@ async function retirerDesFavoris(id) {
         const currentImage = document.getElementById("movieImage").src;
         btn.onclick = () => ajouterAuxFavoris(id, currentTitle, currentImage);
       }
-
       await refreshHomeUserSections();
-    } else {
-      alert(data.message || "Erreur lors de la suppression");
     }
   } catch (err) {
     console.error("Erreur:", err);
@@ -235,82 +249,68 @@ async function ajouterAuxFavoris(id, title, imageUrl) {
       body: form
     });
     
-    const data = await res.json();
-
     if (res.ok) {
-      // 1. Mise à jour du bouton (ton code actuel)
       const favContainer = document.getElementById("favContainer");
       const btn = favContainer.querySelector("button");
       if (btn) {
         btn.innerText = "❤️ Dans tes favoris";
         btn.style.backgroundColor = "#e50914";
       }
-      /*
-      // 2. AFFICHAGE DES RECOMMANDATIONS
-      if (data.recommendations && data.recommendations.length > 0) {
-        afficherLesSuggestions(data.recommendations);
-      } else {
-        alert("Ajouté avec succès !");
-      }*/
       await refreshHomeUserSections();
-    } else {
-      alert(data.message || "Erreur lors de l'ajout");
     }
   } catch (err) {
     console.error("Erreur:", err);
   }
 }
 
+/**
+ * AUTHENTIFICATION & NAVBAR
+ * Gère l'affichage dynamique des menus (Connexion/Déconnexion)
+ */
 function updateNavbar() {
     const user = localStorage.getItem('userConnected');
     const loginBtn = document.getElementById('loginBtn');
-    const dashboardBtn = document.getElementById('dashboardBtn');
+    const logoutBtn = document.getElementById('dashboardBtn');
 
     if (user) {
         if (loginBtn) loginBtn.classList.add('hidden');
-        if (dashboardBtn) {
-            dashboardBtn.classList.remove('hidden');
-            dashboardBtn.innerText = `Se déconnecter (${user})`;
-            dashboardBtn.onclick = () => {
+        if (logoutBtn) {
+            logoutBtn.classList.remove('hidden');
+            logoutBtn.innerText = `Se déconnecter (${user})`;
+            logoutBtn.onclick = () => {
               localStorage.removeItem('userConnected');
               window.location.href = "index.html";
             };
         }
     } else {
         if (loginBtn) loginBtn.classList.remove('hidden');
-        if (dashboardBtn) dashboardBtn.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
     }
 }
-// INSCRIPTION
+
+// Inscription (Requête vers service Data)
 async function sinscrire() {
     const u = document.getElementById('username').value;
     const p = document.getElementById('password').value;
-
-    // On crée un objet FormData (requis par ton Python Form(...))
     const formData = new FormData();
     formData.append('username', u);
     formData.append('password', p);
 
     try {
-        const res = await fetch('http://127.0.0.1:8000/register', {
+        const res = await fetch(`${API_URL}/register`, {
             method: 'POST',
-            body: formData // PAS de JSON.stringify, PAS de Header Content-Type
+            body: formData 
         });
-
-        const data = await res.json();
-
         if (res.ok) {
             alert("Compte créé !");
             window.location.href = "login.html";
-        } else {
-            alert("Erreur : " + (data.detail || "Inscription impossible"));
         }
     } catch (err) {
         alert("Serveur injoignable");
     }
 }
 
-// CONNEXION
+// Connexion (Stockage LocalStorage pour persistance)
 async function connecter(event) {
     if (event) event.preventDefault();
     const u = document.getElementById("username").value;
@@ -321,13 +321,12 @@ async function connecter(event) {
     formData.append('password', p);
 
     try {
-        const res = await fetch('http://127.0.0.1:8000/login', {
+        const res = await fetch(`${API_URL}/login`, {
             method: "POST",
             body: formData
         });
         const data = await res.json();
 
-        // Attention : ton Python renvoie {"status": "ok"}, pas {"success": true}
         if (res.ok && (data.status === "ok" || data.username)) {
             localStorage.setItem("userConnected", u);
             window.location.href = "index.html";
@@ -339,65 +338,25 @@ async function connecter(event) {
     }
 }
 
-async function chargerDashboard() {
-  const user = localStorage.getItem('userConnected');
-  if (!user) return window.location.href = "login.html";
-
-  // 1. Charger les Favoris
-  const resFav = await fetch(`${API_URL}/favorites/${user}`);
-  const favs = await resFav.json();
-  
-  const favsContainer = document.getElementById('favs');
-  if (favsContainer) {
-    if (favs.length === 0) {
-      favsContainer.innerHTML = `<p class="empty-message">Aucun favori pour le moment.</p>`;
-    } else {
-      favsContainer.innerHTML = favs.map(f => `
-        <div class="card favorite-card">
-          <div onclick="chargerEtAfficher(${f.movie_id})">
-            <img src="${f.image_url}">
-            <h3>${f.title}</h3>
-          </div>
-          <button class="remove-fav-btn" onclick="retirerDesFavoris(${f.movie_id})">Retirer</button>
-        </div>
-      `).join('');
-    }
-  }
-
-  // 2. Charger les Recommendations depuis le backend principal
-  try {
-    const resReco = await fetch(`${API_URL}/recommendations/${user}`);
-    const dataReco = await resReco.json();
-    if (dataReco.recommendations && dataReco.recommendations.length > 0) {
-        afficherLesSuggestions(dataReco.recommendations);
-    } else {
-        afficherLesSuggestions([]);
-    }
-  } catch (e) {
-    console.log("Recommendations indisponibles.");
-  }
-}
-
-
-
+// Helper : Transition entre les sections sans rechargement
 async function chargerEtAfficher(movieId) {
     const res = await fetch(`${API_URL}/movies/${movieId}`);
     const movieData = await res.json();
-    showMovie(movieData); // Ta fonction existante
+    showMovie(movieData);
 }
 
+// Rafraîchissement asynchrone des vues Favoris/Reco lors d'un changement d'onglet
 async function refreshHomeUserSections() {
   const movieView = document.getElementById("movieView");
   const user = localStorage.getItem("userConnected");
 
-  if (!user || (movieView && !movieView.classList.contains("hidden"))) {
-    return;
-  }
+  if (!user || (movieView && !movieView.classList.contains("hidden"))) return;
 
   if (currentView === "favorites") await chargerFavoris("homeFavs");
   if (currentView === "recommendations") await chargerRecommendations("homeRecoContainer");
 }
 
+// Chargement des favoris via le service Data
 async function chargerFavoris(containerId) {
   const user = localStorage.getItem("userConnected");
   const favsContainer = document.getElementById(containerId);
@@ -426,6 +385,7 @@ async function chargerFavoris(containerId) {
   `).join('');
 }
 
+// Chargement des recommandations via le Proxy (Contacte le Micro-service 8001)
 async function chargerRecommendations(containerId) {
   const user = localStorage.getItem("userConnected");
   if (!user) return;
@@ -440,33 +400,22 @@ async function chargerRecommendations(containerId) {
   }
 }
 
+/**
+ * COUCHE PRÉSENTATION : SYSTÈME DE RECOMMANDATIONS
+ * Affiche la grille de suggestions avec titre dynamique (ex: 'Similaire à...')
+ */
 function afficherLesSuggestions(movies, containerId = "reco-container") {
-    // 1. On cible l'ID PRÉCIS du container de recommandations
     let recoDiv = document.getElementById(containerId);
-    
-    // Si on ne le trouve pas (par exemple sur l'accueil), on ne fait rien 
-    // ou on cherche un autre endroit spécifique.
     if (!recoDiv) return;
     let titreDynamique = "Suggestions pour vous"; 
-  
 
     if (!movies.length) {
-      recoDiv.innerHTML = `
-        <div id="reco-section" style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
-          <h2 style="color: #e50914;">Suggestions</h2>
-          <p class="empty-message">Aucune recommandation disponible pour le moment.</p>
-        </div>
-      `;
+      recoDiv.innerHTML = `<p class="empty-message">Aucune recommandation pour le moment.</p>`;
       return;
     }
 
-    if (movies[0].info) {
-        // Si le backend a envoyé une info (ex: "Similaire à Batman" ou "Basé sur Action")
-        titreDynamique = movies[0].info; 
-    }
+    if (movies[0].info) titreDynamique = movies[0].info; 
 
-    // 2. On utilise "=" ici, mais ça ne videra QUE la zone "reco-container"
-    // Le reste de ta page (films favoris, menu) restera intact.
     let html = `
         <div id="reco-section" style="margin-top: 40px; border-top: 1px solid #333; padding-top: 20px;">
             <h2 style="color: #e50914;">${titreDynamique}</h2>
@@ -484,10 +433,9 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
             year: m.year || "",
             genre: m.genre || m.genres || "",
             trailer_url: m.trailer_url || "",
-            info: ""//m.info || ""
+            info: ""
         };
         const movieString = JSON.stringify(movieData).replace(/"/g, '&quot;');
-
         html += `
             <div class="card" onclick="showMovie(${movieString})" style="min-width: 180px; cursor: pointer;">
                 ${renderMovieCard(movieData)}
@@ -496,21 +444,19 @@ function afficherLesSuggestions(movies, containerId = "reco-container") {
     });
 
     html += `</div></div>`;
-    
-    // 3. Mise à jour de la zone dédiée uniquement
     recoDiv.innerHTML = html; 
 }
 
+/**
+ * FILTRES DYNAMIQUES
+ * Récupère les catégories existantes depuis la base de données
+ */
 async function loadFilters() {
   const genreFilter = document.getElementById("genreFilter");
   if (!genreFilter) return;
-
   genreFilter.innerHTML = `<option value="">Tous les genres</option>`;
-
   try {
     const res = await fetch(`${API_URL}/movies/filters`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     const data = await res.json();
     const genres = Array.isArray(data.genres) ? data.genres : [];
 
@@ -531,6 +477,7 @@ async function loadFilters() {
   }
 }
 
+// Fallback : Génère les filtres à partir des films déjà chargés si l'endpoint filters échoue
 async function loadFiltersFromMovies() {
   const genreFilter = document.getElementById("genreFilter");
   if (!genreFilter) return;
@@ -558,6 +505,7 @@ async function loadFiltersFromMovies() {
   }
 }
 
+// Remise à zéro pour une nouvelle recherche
 async function resetAndLoadMovies() {
   offset = 0;
   const container = document.getElementById("movies");
@@ -565,6 +513,10 @@ async function resetAndLoadMovies() {
   await loadMovies();
 }
 
+/**
+ * SYSTÈME DE NAVIGATION (SPA)
+ * Bascule l'affichage entre Catalogue, Favoris et Recommandations
+ */
 async function showView(viewName) {
   const user = localStorage.getItem("userConnected");
   currentView = viewName;
@@ -574,53 +526,39 @@ async function showView(viewName) {
     return;
   }
 
-
-  const movieView = document.getElementById("movieView");
-  if (movieView) movieView.classList.add("hidden");
-  
-  const iframe = document.getElementById("trailerIframe");
-  if (iframe) iframe.src = "";
-
+  // Masquage global
+  document.getElementById("movieView").classList.add("hidden");
   document.querySelectorAll(".app-view").forEach(view => view.classList.add("hidden"));
   
-  document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.view === viewName);
-  });
-
-  const searchFilters = document.getElementById("searchFilters");
-  if (searchFilters) searchFilters.classList.toggle("hidden", viewName !== "catalog");
-
-
-  if (viewName === "catalog") {
-    document.getElementById("catalogView").classList.remove("hidden");
+  // Gestion de l'état "actif" sur les boutons de navigation
+  document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.view === viewName));
+  
+  if (document.getElementById("searchFilters")) {
+    document.getElementById("searchFilters").classList.toggle("hidden", viewName !== "catalog");
   }
 
+  // Affichage de la section demandée
+  if (viewName === "catalog") document.getElementById("catalogView").classList.remove("hidden");
   if (viewName === "favorites") {
     document.getElementById("favoritesView").classList.remove("hidden");
     await chargerFavoris("homeFavs");
   }
-
   if (viewName === "recommendations") {
     document.getElementById("recommendationsView").classList.remove("hidden");
     await chargerRecommendations("homeRecoContainer");
   }
 }
 
+/**
+ * INITIALISATION
+ * Point d'entrée principal au chargement de la page
+ */
 document.addEventListener('DOMContentLoaded', () => {
-  // Page LOGIN
-  const loginForm = document.getElementById("loginForm");
-  if (loginForm) loginForm.onsubmit = connecter;
-
-  // Page DASHBOARD
-  if (document.getElementById("favs")) {
-    chargerDashboard();
-    document.getElementById('logoutBtn').onclick = () => {
-      localStorage.removeItem('userConnected');
-      window.location.href = "index.html";
-    };
+  if (document.getElementById("loginForm")) {
+    document.getElementById("loginForm").onsubmit = connecter;
   }
 
-  // Page ACCUEIL
+  // Si on est sur la page principale avec la grille de films
   if (document.getElementById("movies")) {
     loadFilters();
     loadMovies();
@@ -632,8 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // BOUTONS COMMUNS
+  // Liaisons des boutons statiques
   if (document.getElementById("backBtn")) document.getElementById("backBtn").onclick = goHome;
   if (document.getElementById("loginBtn")) document.getElementById("loginBtn").onclick = () => window.location.href="login.html";
-  updateNavbar();
+  
+  updateNavbar(); // Vérification de l'état de session
 });
