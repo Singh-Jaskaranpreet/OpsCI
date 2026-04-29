@@ -521,6 +521,12 @@ async function showView(viewName) {
   const user = localStorage.getItem("userConnected");
   currentView = viewName;
 
+  const iframe = document.getElementById("trailerIframe");
+  if (iframe) {
+    iframe.src = "";
+    iframe.classList.add("hidden");
+  }
+
   if (!user && viewName !== "catalog") {
     window.location.href = "login.html";
     return;
