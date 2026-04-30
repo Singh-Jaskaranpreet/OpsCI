@@ -9,15 +9,18 @@ services:
 
   backend:
     build: ./backend
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://postgres:password@db:5432/movies_db
-      - RECOMMENDATION_URL=http://reco:8001
+      DATABASE_URL: postgresql://postgres:password@db:5432/movies_db
+      RECOMMENDATION_URL: http://reco:8001
     depends_on:
       - db
       - reco
 
   reco:
     build: ./recommendation
+    restart: always
     environment:
       - DATABASE_URL=postgresql://postgres:password@db:5432/movies_db
     depends_on:

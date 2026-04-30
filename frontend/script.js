@@ -313,6 +313,7 @@ async function sinscrire() {
 // Connexion (Stockage LocalStorage pour persistance)
 async function connecter(event) {
     if (event) event.preventDefault();
+
     const u = document.getElementById("username").value;
     const p = document.getElementById("password").value;
 
@@ -320,21 +321,16 @@ async function connecter(event) {
     formData.append('username', u);
     formData.append('password', p);
 
-    try {
-        const res = await fetch(`${API_URL}/login`, {
-            method: "POST",
-            body: formData
-        });
-        const data = await res.json();
+    const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        body: formData
+    });
 
-        if (res.ok && (data.status === "ok" || data.username)) {
-            localStorage.setItem("userConnected", u);
-            window.location.href = "index.html";
-        } else {
-            alert("Identifiants incorrects");
-        }
-    } catch (err) {
-        alert("Erreur serveur");
+    if (res.ok) {
+        localStorage.setItem("userConnected", u);
+        window.location.href = "index.html";
+    } else {
+        alert("Identifiants incorrects");
     }
 }
 

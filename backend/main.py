@@ -164,11 +164,19 @@ def get_trailer(movie_id: int, db: Session = Depends(get_db)):
 
 @app.post("/login")
 def login(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == username, User.password == password).first()
+    user = db.query(User).filter(User.username == username).first()
+
     if not user:
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
-    # On renvoie l'ID en plus du pseudo !
-    return {"status": "ok", "username": username, "user_id": user.id}
+
+    if not verify_password(password, user.password):
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+
+    return {
+        "status": "ok",
+        "username": username,
+        "user_id": user.id
+    }
 
 @app.post("/register")
 def register(username: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
@@ -193,8 +201,8 @@ def add_favorite(
     # 1. Vérification de l'utilisateur
     user = db.query(User).filter(User.username == username).first()
 
-    if not user or not verify_password(password, user.password):
-        raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    if not user:
+        raise HTTPException(status_code=401, detail="Utilisateur non trouvé")
 
     # 2. Ajout aux favoris s'il n'existe pas déjà
     existing = db.query(Favorite).filter(
