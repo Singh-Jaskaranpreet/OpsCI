@@ -12,6 +12,7 @@ from database import SessionLocal, init_db
 from models import Movie, User, Favorite
 from sqlalchemy.orm import Session
 
+from security import hash_password, verify_password
 
 
 app = FastAPI()
@@ -174,7 +175,7 @@ def register(username: str = Form(...), password: str = Form(...), db: Session =
     if db.query(User).filter(User.username == username).first():
         raise HTTPException(status_code=400, detail="L'utilisateur existe déjà")
     
-    new_user = User(username=username, password=password)
+    new_user = User(username=username,password=hash_password(password))
     db.add(new_user)
     db.commit()
     return {"status": "ok"}
@@ -191,8 +192,9 @@ def add_favorite(
 ):
     # 1. Vérification de l'utilisateur
     user = db.query(User).filter(User.username == username).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Utilisateur non trouvé")
+
+    if not user or not verify_password(password, user.password):
+        raise HTTPException(status_code=401, detail="Identifiants incorrects")
 
     # 2. Ajout aux favoris s'il n'existe pas déjà
     existing = db.query(Favorite).filter(

@@ -48,7 +48,7 @@ def normalize_tmdb_movie(m):
     }
 
 
-# 🔥 NEW
+# NEW
 def get_trailer(tmdb_id):
     data = tmdb_get(f"/movie/{tmdb_id}/videos")
 
@@ -60,24 +60,36 @@ def get_trailer(tmdb_id):
 
 
 def update_movies():
+    print("Starting movie update...")
+
     db = SessionLocal()
+
+    # Avoid re-import
+    if db.query(Movie).count() > 0:
+        print("Movies already exist, skipping update")
+        db.close()
+        return
 
     page = 1
 
     while page <= 5:
+        print(f"Fetching page {page}")
+
         data = tmdb_get("/movie/popular", {
             "language": "fr-FR",
             "page": page
         })
 
         for m in data.get("results", []):
-
             movie = normalize_tmdb_movie(m)
-            trailer = get_trailer(movie["tmdb_id"])  # 🔥
+            print(f"Processing: {movie['title']}")
+
+            trailer = get_trailer(movie["tmdb_id"])
 
             exists = db.query(Movie).filter_by(tmdb_id=movie["tmdb_id"]).first()
 
             if exists:
+                print(f" Updating {movie['title']}")
                 exists.title = movie["title"]
                 exists.description = movie["description"]
                 exists.image_url = movie["image_url"]
@@ -86,6 +98,7 @@ def update_movies():
                 exists.genre = movie["genre"]
                 exists.trailer_url = trailer
             else:
+                print(f"Inserting {movie['title']}")
                 db.add(Movie(
                     tmdb_id=movie["tmdb_id"],
                     title=movie["title"],
@@ -93,7 +106,7 @@ def update_movies():
                     image_url=movie["image_url"],
                     year=movie["year"],
                     rating=movie["rating"],
-                    genre = movie["genre"],
+                    genre=movie["genre"],
                     trailer_url=trailer
                 ))
 
@@ -101,8 +114,7 @@ def update_movies():
         page += 1
 
     db.close()
-    print("update done")
-
+    print("Movie update finished")
 
 if __name__ == "__main__":
     update_movies()
