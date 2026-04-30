@@ -1,11 +1,19 @@
-fastapi==0.115.12
-uvicorn==0.30.1
-sqlalchemy==2.0.30
-psycopg2-binary==2.9.9
+# Core API
+fastapi==0.115.8
+uvicorn==0.34.0
 python-dotenv==1.0.1
 requests==2.32.3
-python-multipart==0.0.9
+python-multipart==0.0.20
 
-#pour passwords 
+# Database
+sqlalchemy==2.0.37
+psycopg2-binary==2.9.10
+
+# Tests (utilisés dans le pipeline CI)
+pytest==8.3.4
+pytest-cov==6.0.0
+httpx==0.28.1
+
+#Pour passwords 
 passlib[bcrypt]==1.7.4
-bcrypt==3.2.2
+bcrypt==4.0.1

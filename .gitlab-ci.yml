@@ -2,8 +2,10 @@ workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH == "feature/front-back"'
+    - if: '$CI_COMMIT_BRANCH == "test"'
     - when: never
 
+# Image par défaut pour les jobs Node/Frontend
 image: node:18
 
 stages:
@@ -12,49 +14,58 @@ stages:
   - build-docker
   - deploy
 
-# 1. STAGE TEST : Vérification avec syntaxe "Block Scalar" (|) pour éviter les erreurs
+# 1. STAGE TEST : Vérification de la structure du projet
 check-files:
   stage: test
   script:
-    - echo "Vérification de l'arborescence complète..."
-    - ls -R
+    - echo "Vérification de l'arborescence..."
     - |
-      echo "Vérification du Frontend..."
-      if [ ! -f frontend/index.html ] || [ ! -f frontend/script.js ] || [ ! -f frontend/Dockerfile ] || [ ! -f frontend/nginx.conf ]; then 
-        echo "Erreur: Fichiers Frontend critiques manquants"; exit 1; 
-      fi
-    - |
-      echo "Vérification des Backends..."
-      if [ ! -f backend/main.py ] || [ ! -f backend/Dockerfile ] || [ ! -f recommendation/recom.py ] || [ ! -f recommendation/Dockerfile ]; then 
-        echo "Erreur: Fichiers Backend ou Recommendation critiques manquants"; exit 1; 
+      if [ ! -d backend/tests ] || [ ! -f backend/requirements.txt ]; then 
+        echo "Erreur: Structure Backend invalide"; exit 1; 
       fi
 
 # 2. STAGE UNIT-TEST
 frontend-jest:
   stage: unit-test
   script:
-    - echo "Installation des dépendances de test à la racine..."
     - npm install jest jest-environment-jsdom jest-junit
-    
-    - echo "Lancement des tests sur __tests__/unit_test.js..."
-    # On reste à la racine pour que Jest voie à la fois le dossier __tests__ et le dossier frontend
     - npx jest __tests__/unit_test.js --ci --reporters=default --reporters=jest-junit --outputFile=frontend/junit.xml
   artifacts:
     when: always
     reports:
       junit: frontend/junit.xml
-  rules:
-    - exists:
-        - __tests__/unit_test.js
 
-backend-syntax:
+backend-test:
   stage: unit-test
   image: python:3.11-slim
   script:
-    - pip install -r backend/requirements.txt
-    - pip install -r recommendation/requirements.txt
-    - python -m py_compile backend/*.py
-    - python -m py_compile recommendation/*.py
+    - cd backend
+    # Installation des dépendances incluant pytest-cov et httpx
+    - pip install --no-cache-dir -r requirements.txt
+    # Lancement des tests avec génération de rapports
+    - pytest -v --cov=. --cov-report=xml:coverage.xml --junitxml=junit.xml tests/
+  artifacts:
+    when: always
+    reports:
+      junit: backend/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: backend/coverage.xml
+
+recommendation-test:
+  stage: unit-test
+  image: python:3.11-slim
+  script:
+    - cd recommendation
+    - pip install --no-cache-dir -r requirements.txt
+    - pytest -v --cov=. --cov-report=xml:coverage.xml --junitxml=junit.xml tests/
+  artifacts:
+    when: always
+    reports:
+      junit: recommendation/junit.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: recommendation/coverage.xml
 
 # 3. STAGE BUILD-DOCKER
 build-microservices:
@@ -65,13 +76,15 @@ build-microservices:
   variables:
     DOCKER_DRIVER: overlay2
   script:
+    # Construit les images basées sur tes Dockerfiles
     - docker compose build
 
-# 4. STAGE DEPLOY
+# 4. STAGE DEPLOY (GitLab Pages pour le Front Orange)
 pages:
   stage: deploy
   script:
     - mkdir -p public
+    # On expose tous les fichiers du nouveau design orange
     - cp frontend/index.html frontend/style.css frontend/script.js frontend/login.html frontend/register.html public/
   artifacts:
     paths:
