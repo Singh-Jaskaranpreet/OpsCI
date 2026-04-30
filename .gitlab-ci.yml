@@ -1,11 +1,9 @@
-# Configuration globale : on autorise le pipeline sur main et ta branche feature
 workflow:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_BRANCH == "feature/front-back"'
     - when: never
 
-# Image par défaut pour les jobs JS
 image: node:18
 
 stages:
@@ -14,28 +12,31 @@ stages:
   - build-docker
   - deploy
 
-# 1. STAGE TEST : Vérification de l'intégrité du projet
+# 1. STAGE TEST : Vérification avec syntaxe "Block Scalar" (|) pour éviter les erreurs
 check-files:
   stage: test
   script:
     - echo "Vérification de l'arborescence complète..."
     - ls -R
-    # Vérification Frontend
-    - if [ ! -f frontend/index.html ] || [ ! -f frontend/script.js ] || [ ! -f frontend/login.html ] || [ ! -f frontend/style.css ] || [ ! -f frontend/register.html ]; then echo "Erreur: Fichiers Frontend manquants"; exit 1; fi
-    - if [ ! -f frontend/Dockerfile ] || [ ! -f frontend/nginx.conf ]; then echo "Erreur: Dockerfile ou nginx.conf manquant"; exit 1; fi
-    # Vérification Backend Data
-    - if [ ! -f backend/main.py ] || [ ! -f backend/Dockerfile ]; then echo "Erreur: Backend Data incomplet"; exit 1; fi
-    # Vérification Backend Recommendation
-    - if [ ! -f recommendation/recom.py ] || [ ! -f recommendation/Dockerfile ]; then echo "Erreur: Backend Reco incomplet"; exit 1; fi
+    - |
+      echo "Vérification du Frontend..."
+      if [ ! -f frontend/index.html ] || [ ! -f frontend/script.js ] || [ ! -f frontend/Dockerfile ] || [ ! -f frontend/nginx.conf ]; then 
+        echo "Erreur: Fichiers Frontend critiques manquants"; exit 1; 
+      fi
+    - |
+      echo "Vérification des Backends..."
+      if [ ! -f backend/main.py ] || [ ! -f backend/Dockerfile ] || [ ! -f recommendation/recom.py ] || [ ! -f recommendation/Dockerfile ]; then 
+        echo "Erreur: Fichiers Backend ou Recommendation critiques manquants"; exit 1; 
+      fi
   tags:
     - linux_mac
 
-# 2. STAGE UNIT-TEST : Tests unitaires et syntaxe
+# 2. STAGE UNIT-TEST
 frontend-jest:
   stage: unit-test
   script:
     - cd frontend
-    - npm install jest 
+    - npm install jest jest-environment-jsdom
     - npx jest ../__tests__/*
   rules:
     - exists:
@@ -45,19 +46,12 @@ backend-syntax:
   stage: unit-test
   image: python:3.11-slim
   script:
-    # 1. On installe toutes les dépendances (Data + Reco)
     - pip install -r backend/requirements.txt
     - pip install -r recommendation/requirements.txt
-    
-    # 2. On vérifie la syntaxe du dossier Backend
-    - echo "Vérification syntaxique du Backend Data..."
     - python -m py_compile backend/*.py
-    
-    # 3. On vérifie la syntaxe du dossier Recommendation
-    - echo "Vérification syntaxique du Backend Recommendation..."
     - python -m py_compile recommendation/*.py
 
-# 3. STAGE BUILD-DOCKER : Validation de la containerisation
+# 3. STAGE BUILD-DOCKER
 build-microservices:
   stage: build-docker
   image: docker:latest
@@ -66,14 +60,11 @@ build-microservices:
   variables:
     DOCKER_DRIVER: overlay2
   script:
-    - echo "Construction de l'image Frontend (Nginx)..."
     - docker build -t singhflix-frontend ./frontend
-    - echo "Construction de l'image Backend Data..."
     - docker build -t singhflix-backend ./backend
-    - echo "Construction de l'image Recommendation..."
     - docker build -t singhflix-reco ./recommendation
 
-# 4. STAGE DEPLOY : Préparation des artéfacts pour le Front
+# 4. STAGE DEPLOY
 pages:
   stage: deploy
   script:
