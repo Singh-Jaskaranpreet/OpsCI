@@ -17,17 +17,31 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
   // --- CONFIGURATION DU DOM ---
   beforeEach(() => {
     document.body.innerHTML = `
-      <div id="navbar">
-        <button id="loginBtn"></button>
-        <button id="dashboardBtn" class="hidden"></button>
-      </div>
-      <div id="searchSection">
-        <input id="search" value="">
-        <select id="genreFilter"><option value="">Tous</option></select>
-      </div>
+      <button id="loginBtn"></button>
+      <button id="dashboardBtn" class="hidden"></button>
+      
+      <input id="search" value="">
+      <select id="genreFilter"><option value="">Tous</option></select>
+      
+      <div id="movieView" class="app-view"></div>
+      <div id="catalogView" class="app-view"></div>
+      <div id="searchFilters"></div>
+      <div id="loadMore"></div>
+      <iframe id="trailerIframe" src=""></iframe>
+      
+      <div id="movies"></div>
       <div id="reco-container"></div>
+      <div id="favContainer"></div>
+      
+      <div id="title"></div>
+      <div id="genre"></div>
+      <div id="year"></div>
+      <div id="rating"></div>
+      <div id="desc"></div>
+      <img id="movieImage" src="">
     `;
-    localStorage.clear(); // On repart de zéro pour chaque test
+    localStorage.clear();
+    jest.clearAllMocks(); // Nettoie les simulations d'alertes ou de fetch
   });
 
   // --- 1. TESTS DE NAVIGATION & API ---
@@ -39,9 +53,15 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
     });
 
     test('doit ajouter le filtre de genre dans l\'URL si sélectionné', () => {
+      // On simule la sélection du genre dans le DOM
       document.getElementById('genreFilter').value = 'Sci-Fi';
-      const params = getMovieQueryParams();
-      expect(params).toContain('genre=Sci-Fi');
+      
+      const paramsString = getMovieQueryParams();
+      // On utilise URLSearchParams pour vérifier proprement les clés/valeurs
+      const params = new URLSearchParams(paramsString);
+      
+      expect(params.get('genre')).toBe('Sci-Fi');
+      expect(params.get('limit')).toBe('14');
     });
   });
 
