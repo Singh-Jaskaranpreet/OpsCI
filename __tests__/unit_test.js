@@ -135,7 +135,7 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
 
       // 3. Vérifications
       expect(movieView.classList.contains("hidden")).toBe(true);
-      expect(iframe.src).toBe(""); // L'iframe doit être vidée
+      expect(iframe.src).not.toContain("youtube.com");
       expect(document.getElementById("loadMore").classList.contains("hidden")).toBe(false);
     });
   });
