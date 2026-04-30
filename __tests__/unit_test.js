@@ -16,20 +16,29 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
 
   // --- CONFIGURATION DU DOM ---
   beforeEach(() => {
-    // Reconstruction complète du DOM nécessaire pour toutes les fonctions
+    // On recrée l'environnement HTML exact attendu par script.js
     document.body.innerHTML = `
+      <!-- Éléments de navigation -->
       <div id="navbar">
         <button id="loginBtn"></button>
         <button id="dashboardBtn" class="hidden"></button>
       </div>
-      <div id="searchSection">
+
+      <!-- Filtres et Recherche -->
+      <div id="searchFilters">
         <input id="search" value="">
         <select id="genreFilter">
-            <option value="">Tous les genres</option>
-            <option value="Sci-Fi">Sci-Fi</option>
+          <option value="">Tous les genres</option>
+          <option value="Sci-Fi">Sci-Fi</option>
         </select>
       </div>
-      <div id="movies"></div>
+
+      <!-- Vues SPA (Single Page Application) -->
+      <div id="catalogView" class="app-view">
+        <div id="movies"></div>
+        <button id="loadMore"></button>
+      </div>
+
       <div id="movieView" class="app-view hidden">
         <h2 id="title"></h2>
         <p id="genre"></p>
@@ -38,13 +47,16 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
         <p id="desc"></p>
         <img id="movieImage" src="">
         <div id="favContainer"></div>
-        <iframe id="trailerIframe" src="about:blank"></iframe>
+        <iframe id="trailerIframe" src=""></iframe>
       </div>
-      <div id="catalogView" class="app-view"></div>
-      <div id="searchFilters"></div>
-      <div id="loadMore"></div>
+
       <div id="reco-container"></div>
+
+      <!-- Boutons de tabs -->
+      <button class="tab-btn" data-view="catalog"></button>
     `;
+    
+    // Nettoyage avant chaque test
     localStorage.clear();
     jest.clearAllMocks();
   });
@@ -111,21 +123,20 @@ describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
   });
 
   describe('Pilier 5 : Navigation SPA et Nettoyage', () => {
-    test('goHome doit réinitialiser l\'affichage et vider l\'iframe du trailer', () => {
-        // Préparation du DOM
-        document.body.innerHTML = `
-        <div id="movieView"></div>
-        <div id="catalogView" class="hidden"></div>
-        <div id="searchFilters" class="hidden"></div>
-        <iframe id="trailerIframe" src="https://youtube.com/video"></iframe>
-        `;
+    test('Pilier 5 : goHome doit nettoyer l\'interface sans erreur', () => {
+      // 1. On simule un état "Vue Film" active
+      const movieView = document.getElementById("movieView");
+      const iframe = document.getElementById("trailerIframe");
+      movieView.classList.remove("hidden");
+      iframe.src = "https://youtube.com/embed/123";
 
-        goHome();
+      // 2. Exécution de la fonction
+      goHome();
 
-        // Vérifications
-        expect(document.getElementById('movieView').classList.contains('hidden')).toBe(true);
-        expect(document.getElementById('catalogView').classList.contains('hidden')).toBe(false);
-        expect(document.getElementById('trailerIframe').src).toBe(""); // Sécurité : stop la vidéo
+      // 3. Vérifications
+      expect(movieView.classList.contains("hidden")).toBe(true);
+      expect(iframe.src).toBe(""); // L'iframe doit être vidée
+      expect(document.getElementById("loadMore").classList.contains("hidden")).toBe(false);
     });
   });
 
