@@ -33,16 +33,19 @@ check-files:
 frontend-jest:
   stage: unit-test
   script:
-    - cd frontend
-    - npm install jest jest-environment-jsdom jest-junit # Ajout de jest-junit
-    - npx jest ../__tests__/* --ci --reporters=default --reporters=jest-junit # Génère le rapport
+    - echo "Installation des dépendances de test à la racine..."
+    - npm install jest jest-environment-jsdom jest-junit
+    
+    - echo "Lancement des tests sur __tests__/unit_test.js..."
+    # On reste à la racine pour que Jest voie à la fois le dossier __tests__ et le dossier frontend
+    - npx jest __tests__/unit_test.js --ci --reporters=default --reporters=jest-junit --outputFile=frontend/junit.xml
   artifacts:
     when: always
     reports:
-      junit: frontend/junit.xml # Indique à GitLab où lire les résultats
+      junit: frontend/junit.xml
   rules:
     - exists:
-        - __tests__/**/*
+        - __tests__/unit_test.js
 
 backend-syntax:
   stage: unit-test
