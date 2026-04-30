@@ -65,9 +65,7 @@ build-microservices:
   variables:
     DOCKER_DRIVER: overlay2
   script:
-    - docker build -t singhflix-frontend ./frontend
-    - docker build -t singhflix-backend ./backend
-    - docker build -t singhflix-reco ./recommendation
+    - docker compose build
 
 # 4. STAGE DEPLOY
 pages:
