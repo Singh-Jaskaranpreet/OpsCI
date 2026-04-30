@@ -582,3 +582,14 @@ document.addEventListener('DOMContentLoaded', () => {
   
   updateNavbar(); // Vérification de l'état de session
 });
+
+if (typeof module !== 'undefined') {
+  module.exports = { 
+    getMovieQueryParams, 
+    renderMovieCard, 
+    updateNavbar, 
+    afficherLesSuggestions,
+    goHome,
+    retirerDesFavoris
+  };
+}

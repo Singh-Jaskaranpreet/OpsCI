@@ -2,60 +2,123 @@
  * @jest-environment jsdom
  */
 
- global.TextEncoder = require("util").TextEncoder;
- global.TextDecoder = require("util").TextDecoder;
- 
- const { JSDOM } = require("jsdom");
- const fs = require("fs");
- const path = require("path");
- 
- describe("Form Submission", () => {
-     let document, form, window;
- 
-     beforeEach(() => {
-         // Charger le fichier HTML
-         const html = fs.readFileSync(path.resolve(__dirname, "../simple_app/index.html"), "utf8");
- 
-         // Simuler le DOM avec JSDOM
-         const dom = new JSDOM(html, { runScripts: "dangerously", resources: "usable" });
-         document = dom.window.document;
-         window = dom.window;
- 
-         // Charger manuellement le script
-         const scriptPath = path.resolve(__dirname, "../simple_app/script.js");
-         const scriptContent = fs.readFileSync(scriptPath, "utf8");
-         const scriptElement = document.createElement("script");
-         scriptElement.textContent = scriptContent;
-         document.body.appendChild(scriptElement);
- 
-         // Récupérer le formulaire
-         form = document.getElementById("studentForm");
-     });
- 
-     test("Remplir et soumettre le formulaire met à jour l'affichage", async () => {
-         expect(form).not.toBeNull(); // Vérifier que le formulaire existe
- 
-         document.getElementById("name").value = "Bob Alice";
-         document.getElementById("dob").value = "1990-01-01";
-         document.getElementById("email").value = "Bob_alice@example.com";
-         document.getElementById("bio").value = "Développeur passionné.";
-         document.getElementById("skills").value = "JavaScript, React";
-         document.getElementById("linkedin").value = "https://linkedin.com/in/bob_alice";
- 
-         // Simuler la soumission du formulaire
-         const event = new window.Event("submit", { bubbles: true, cancelable: true });
-         form.dispatchEvent(event);
- 
-         // Attendre la mise à jour du DOM
-         await new Promise((resolve) => setTimeout(resolve, 50));
- 
-         // Vérifier que les champs affichent bien les valeurs soumises
-         expect(document.getElementById("displayName").textContent).toBe("Bob Alice");
-         expect(document.getElementById("displayDob").textContent).toBe("1990-01-01");
-         expect(document.getElementById("displayEmail").textContent).toBe("Bob_alice@example.com");
-         expect(document.getElementById("displayBio").textContent).toBe("Développeur passionné.");
-         expect(document.getElementById("displaySkills").textContent).toBe("JavaScript, React");
-         expect(document.getElementById("displayLinkedin").href).toContain("https://linkedin.com/in/bob_alice");
-     });
- });
- 
+// Importation de toutes les fonctions exportées depuis ton script
+const { 
+  getMovieQueryParams, 
+  renderMovieCard, 
+  updateNavbar, 
+  afficherLesSuggestions,
+  goHome,
+  retirerDesFavoris
+} = require('../frontend/script.js');
+
+describe('SUITE DE TESTS COMPLÈTE - FRONTEND LOGIC', () => {
+
+  // --- CONFIGURATION DU DOM ---
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="navbar">
+        <button id="loginBtn"></button>
+        <button id="dashboardBtn" class="hidden"></button>
+      </div>
+      <div id="searchSection">
+        <input id="search" value="">
+        <select id="genreFilter"><option value="">Tous</option></select>
+      </div>
+      <div id="reco-container"></div>
+    `;
+    localStorage.clear(); // On repart de zéro pour chaque test
+  });
+
+  // --- 1. TESTS DE NAVIGATION & API ---
+  describe('Pilier 1 : Logique de requête (API)', () => {
+    test('doit inclure limit=14 et offset par défaut', () => {
+      const params = getMovieQueryParams();
+      expect(params).toContain('limit=14');
+      expect(params).toContain('offset=0');
+    });
+
+    test('doit ajouter le filtre de genre dans l\'URL si sélectionné', () => {
+      document.getElementById('genreFilter').value = 'Sci-Fi';
+      const params = getMovieQueryParams();
+      expect(params).toContain('genre=Sci-Fi');
+    });
+  });
+
+  // --- 2. TESTS DE RENDU (TEMPLATING) ---
+  describe('Pilier 2 : Rendu des composants (UI)', () => {
+    test('renderMovieCard doit gérer l\'absence de poster', () => {
+      const movie = { title: 'Dune' }; // Pas de image_url
+      const html = renderMovieCard(movie);
+      expect(html).toContain('src=""'); // Vérifie qu'il n'y a pas "undefined"
+      expect(html).toContain('Dune');
+    });
+
+    test('renderMovieCard doit afficher le badge de recommandation si présent', () => {
+      const html = renderMovieCard({ title: 'A' }, { info: '90% Match' });
+      expect(html).toContain('reco-info');
+      expect(html).toContain('90% Match');
+    });
+  });
+
+  // --- 3. TESTS DE SÉCURITÉ & SESSION ---
+  describe('Pilier 3 : Gestion de l\'état (Sécurité)', () => {
+    test('updateNavbar doit afficher le pseudo de l\'utilisateur connecté', () => {
+      localStorage.setItem('userConnected', 'Admin_Singh');
+      updateNavbar();
+      const logoutBtn = document.getElementById('dashboardBtn');
+      expect(logoutBtn.innerText).toContain('Admin_Singh');
+      expect(logoutBtn.classList.contains('hidden')).toBe(false);
+    });
+  });
+
+  // --- 4. TESTS DE RÉSILIENCE (FAIL-SOFT) ---
+  describe('Pilier 4 : Résilience face aux micro-services', () => {
+    test('afficherLesSuggestions doit informer l\'utilisateur si le service Reco est vide', () => {
+      afficherLesSuggestions([], 'reco-container');
+      const container = document.getElementById('reco-container');
+      expect(container.innerHTML).toContain('Aucune recommandation pour le moment');
+    });
+
+    test('afficherLesSuggestions doit utiliser un titre dynamique basé sur les données', () => {
+      const fakeMovies = [{ title: 'Film 1', info: 'Parce que vous avez aimé Batman' }];
+      afficherLesSuggestions(fakeMovies, 'reco-container');
+      expect(document.getElementById('reco-container').innerHTML).toContain('Parce que vous avez aimé Batman');
+    });
+  });
+
+  describe('Pilier 5 : Navigation SPA et Nettoyage', () => {
+    test('goHome doit réinitialiser l\'affichage et vider l\'iframe du trailer', () => {
+        // Préparation du DOM
+        document.body.innerHTML = `
+        <div id="movieView"></div>
+        <div id="catalogView" class="hidden"></div>
+        <div id="searchFilters" class="hidden"></div>
+        <iframe id="trailerIframe" src="https://youtube.com/video"></iframe>
+        `;
+
+        goHome();
+
+        // Vérifications
+        expect(document.getElementById('movieView').classList.contains('hidden')).toBe(true);
+        expect(document.getElementById('catalogView').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('trailerIframe').src).toBe(""); // Sécurité : stop la vidéo
+    });
+  });
+
+  describe('Pilier 6 : Actions Utilisateur et Protections', () => {
+    test('retirerDesFavoris doit bloquer l\'action si l\'utilisateur n\'est pas connecté', () => {
+        // On s'assure que le localStorage est vide
+        localStorage.clear();
+        
+        // On simule l'alerte du navigateur
+        global.alert = jest.fn(); 
+
+        retirerDesFavoris(123);
+
+        // Vérifie que l'alerte a été affichée et que rien n'a été envoyé
+        expect(global.alert).toHaveBeenCalledWith("Connecte-toi d'abord !");
+    });
+  });
+
+});
