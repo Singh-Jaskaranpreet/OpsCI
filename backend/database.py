@@ -16,10 +16,10 @@ for i in range(10):
         engine = create_engine(DATABASE_URL)
         conn = engine.connect()
         conn.close()
-        print("✅ DB connected")
+        print("DB connected")
         break
     except Exception as e:
-        print(f"⏳ DB not ready, retry {i}")
+        print(f"DB not ready, retry {i}")
         time.sleep(2)
 
 SessionLocal = sessionmaker(bind=engine)

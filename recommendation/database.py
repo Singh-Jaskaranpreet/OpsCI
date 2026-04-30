@@ -7,7 +7,7 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = None
 
-# 🔥 THIS is what prevents container crash
+# THIS is what prevents container crash
 for i in range(10):
     try:
         engine = create_engine(DATABASE_URL)
@@ -16,11 +16,11 @@ for i in range(10):
         print("✅ DB connected")
         break
     except Exception as e:
-        print(f"⏳ DB not ready (attempt {i})")
+        print(f"DB not ready (attempt {i})")
         time.sleep(2)
 
 if engine is None:
-    raise Exception("❌ Could not connect to DB")
+    raise Exception("Could not connect to DB")
 
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()

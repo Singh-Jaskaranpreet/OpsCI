@@ -14,7 +14,7 @@ read -p "Enter choice: " choice
 
 # ================= DOCKER =================
 if [ "$choice" == "1" ]; then
-    echo "🐳 Running with Docker..."
+    echo "Running with Docker..."
 
     # ensure local docker
     eval $(minikube docker-env -u)
@@ -34,59 +34,59 @@ if [ "$choice" == "1" ]; then
     echo "All connected via docker network"
     echo "====================================="
 
-    echo "👉 Open: http://127.0.0.1:3000/index.html"
+    echo "Open: http://127.0.0.1:3000/index.html"
 
 
 # ================= KUBERNETES =================
 elif [ "$choice" == "2" ]; then
-    echo "☸️ Running with Kubernetes..."
+    echo "Running with Kubernetes..."
 
     # Start cluster
     minikube start --memory=2500mb --cpus=2
     eval $(minikube docker-env)
 
-    echo "🔨 Building images inside Minikube..."
+    echo "Building images inside Minikube..."
     docker build -t opsci-backend ./backend
     docker build -t opsci-frontend ./frontend
     docker build -t opsci-reco ./recommendation
 
-    echo "📦 Creating namespace..."
+    echo "Creating namespace..."
     kubectl apply -f k8s/namespace.yaml
 
-    echo "🔐 Applying secrets & config..."
+    echo "Applying secrets & config..."
     kubectl apply -f k8s/secret.yaml
     kubectl apply -f k8s/tmdb-secret.yaml
     kubectl apply -f k8s/configmap.yaml
 
-    echo "🗄️ Deploying database..."
+    echo "Deploying database..."
     kubectl apply -f k8s/db/
 
-    echo "⏳ Waiting for database to be ready..."
+    echo "Waiting for database to be ready..."
     kubectl wait --for=condition=ready pod -l app=db -n opsci --timeout=60s
 
-    echo "⚙️ Deploying backend & reco..."
+    echo "Deploying backend & reco..."
     kubectl apply -f k8s/backend/
     kubectl apply -f k8s/recommendation/
 
-    echo "🌐 Deploying frontend..."
+    echo "Deploying frontend..."
     kubectl apply -f k8s/frontend/
 
-    echo "⏳ Waiting for all pods..."
+    echo "Waiting for all pods..."
     kubectl wait --for=condition=ready pod --all -n opsci --timeout=120s
 
-    echo "🌐 Enabling ingress..."
+    echo "Enabling ingress..."
     minikube addons enable ingress
 
-    echo "⏳ Waiting for ingress controller..."
+    echo "Waiting for ingress controller..."
     kubectl wait --namespace ingress-nginx \
     --for=condition=ready pod \
     --selector=app.kubernetes.io/component=controller \
     --timeout=90s
 
-    echo "🚀 Applying ingress..."
+    echo "Applying ingress..."
     kubectl apply -f k8s/ingress.yaml
 
-    echo "📊 Final status:"
+    echo "Final status:"
     kubectl get all -n opsci
 
     echo "====================================="
@@ -103,9 +103,9 @@ elif [ "$choice" == "2" ]; then
     echo "====================================="
 
     echo "=====================================" 
-    echo "✅ Kubernetes deployment complete" 
+    echo "Kubernetes deployment complete" 
     echo "=====================================" 
-    echo "👉 Access:" 
+    echo "Access:" 
     echo "http://opsci.local (Ingress)" 
     echo "" 
     echo "If ingress fails:"
@@ -114,30 +114,30 @@ elif [ "$choice" == "2" ]; then
 
 # ================= CLEAN =================
 elif [ "$choice" == "3" ]; then
-    echo "🧹 Cleaning everything..."
+    echo "Cleaning everything..."
 
-    echo "🔄 Switching to local Docker..."
+    echo "Switching to local Docker..."
     eval $(minikube docker-env -u)
 
-    echo "🐳 Cleaning Docker..."
+    echo "Cleaning Docker..."
     docker compose down -v 2>/dev/null
 
-    echo "🧼 Removing project images..."
+    echo "Removing project images..."
     docker rmi opsci-backend opsci-frontend opsci-reco 2>/dev/null
 
-    echo "🧹 Removing unused volumes..."
+    echo "Removing unused volumes..."
     docker volume prune -f
 
-    echo "🧹 Removing unused images (safe)..."
+    echo "Removing unused images (safe)..."
     docker image prune -f
 
-    echo "☸️ Deleting Kubernetes cluster..."
+    echo "Deleting Kubernetes cluster..."
     minikube delete 2>/dev/null
 
-    echo "🧼 Removing namespace if exists..."
+    echo "Removing namespace if exists..."
     kubectl delete namespace opsci --ignore-not-found 2>/dev/null
 
-    echo "✅ Clean environment ready"
+    echo "Clean environment ready"
     
 
 
@@ -145,9 +145,9 @@ elif [ "$choice" == "3" ]; then
 # ================= MANUAL =================
 
 elif [ "$choice" == "4" ]; then
-echo "🧠 Running WITHOUT Docker/Kubernetes"
+echo "Running WITHOUT Docker/Kubernetes"
 
-    echo "👉 Open 3 terminals:"
+    echo "Open 3 terminals:"
 
     echo ""
     echo "Terminal 1 (Backend):"
@@ -181,5 +181,5 @@ echo "🧠 Running WITHOUT Docker/Kubernetes"
 
 # ================= ERROR =================
 else
-    echo "❌ Invalid choice"
+    echo "Invalid choice"
 fi
