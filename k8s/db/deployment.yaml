@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: opsci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        envFrom:
+          - secretRef:
+              name: db-secret
+        ports:
+          - containerPort: 5432
