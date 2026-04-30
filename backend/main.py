@@ -12,7 +12,7 @@ from database import SessionLocal, init_db
 from models import Movie, User, Favorite
 from sqlalchemy.orm import Session
 
-init_db()
+
 
 app = FastAPI()
 
@@ -27,8 +27,14 @@ app.add_middleware(
 BASE_DIR = Path(__file__).parent
 EXPORT_DIR = BASE_DIR / "exports"
 EXPORT_DIR.mkdir(exist_ok=True)
-RECOMMENDATION_URL = os.getenv("RECOMMENDATION_URL", "http://localhost:8001")
+RECOMMENDATION_URL = os.getenv("RECOMMENDATION_URL", "http://reco:8001")
 
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+    
 @app.get("/hello")
 def hello():
     return {"message": "Hello World"}

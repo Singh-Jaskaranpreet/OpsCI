@@ -1,10 +1,6 @@
-fastapi==0.136.1
-uvicorn==0.46.0
-python-dotenv==1.2.2
-requests==2.33.1
-pydantic==2.13.3
-python-multipart==0.0.27
-
-# DB
+fastapi==0.115.12
+uvicorn==0.30.1
 sqlalchemy==2.0.30
 psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+requests==2.32.3

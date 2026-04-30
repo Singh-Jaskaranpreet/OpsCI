@@ -1,6 +1,6 @@
 /* --- CONFIGURATION GLOBALE --- */
 // URL du point d'entrée unique (API Gateway / Proxy Backend)
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "/api";
 
 let offset = 0; // Index de départ pour la pagination des films
 const LIMIT = 14; // Nombre de films à charger par requête

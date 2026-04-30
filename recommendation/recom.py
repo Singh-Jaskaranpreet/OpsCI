@@ -11,7 +11,7 @@ load_dotenv()
 from database import SessionLocal, init_db
 from models import Favorite, Movie, RecommendationCache
 
-init_db()
+
 
 app = FastAPI(title="SinghFlix AI Recommendation - Multi-Genre Mode")
 RECOMMENDATION_ALGORITHM_VERSION = "all-favorites-v2"
@@ -25,6 +25,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def startup():
+    init_db()
+
+    
 # --- DÉPENDANCE BDD ---
 def get_db():
     db = SessionLocal()
@@ -69,8 +75,7 @@ def calculate_recommendations(favs, db: Session):
     if not favs:
         # Fallback si pas de favoris : on renvoie les mieux notés
         top_movies = db.query(Movie).order_by(Movie.rating.desc()).limit(RECOMMENDATION_LIMIT).all()
-        return [format_movie(m, "Films les mieux notés")]
-
+        return [format_movie(m, "Films les mieux notés") for m in top_movies]
     fav_ids = []
     favorite_profiles = []
 
