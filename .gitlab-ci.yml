@@ -28,8 +28,6 @@ check-files:
       if [ ! -f backend/main.py ] || [ ! -f backend/Dockerfile ] || [ ! -f recommendation/recom.py ] || [ ! -f recommendation/Dockerfile ]; then 
         echo "Erreur: Fichiers Backend ou Recommendation critiques manquants"; exit 1; 
       fi
-  tags:
-    - linux_mac
 
 # 2. STAGE UNIT-TEST
 frontend-jest:
