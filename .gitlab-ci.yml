@@ -36,8 +36,12 @@ frontend-jest:
   stage: unit-test
   script:
     - cd frontend
-    - npm install jest jest-environment-jsdom
-    - npx jest ../__tests__/*
+    - npm install jest jest-environment-jsdom jest-junit # Ajout de jest-junit
+    - npx jest ../__tests__/* --ci --reporters=default --reporters=jest-junit # Génère le rapport
+  artifacts:
+    when: always
+    reports:
+      junit: frontend/junit.xml # Indique à GitLab où lire les résultats
   rules:
     - exists:
         - __tests__/**/*
