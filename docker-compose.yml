@@ -9,11 +9,10 @@ services:
 
   backend:
     build: ./backend
-    env_file:
-      - .env
     environment:
       DATABASE_URL: postgresql://postgres:password@db:5432/movies_db
       RECOMMENDATION_URL: http://reco:8001
+      TMDB_TOKEN: ${TMDB_TOKEN}
     depends_on:
       - db
       - reco

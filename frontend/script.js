@@ -562,6 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Si on est sur la page principale avec la grille de films
   if (document.getElementById("movies")) {
+    showView('catalog');
     loadFilters();
     loadMovies();
     document.getElementById("loadMore").onclick = loadMovies;
